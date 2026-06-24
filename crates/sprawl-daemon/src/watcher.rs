@@ -44,6 +44,7 @@ impl EventDeduplicator {
     }
 }
 
+#[allow(dead_code)]
 pub struct FilesystemWatcher {
     watcher: RecommendedWatcher,
     _rx: Receiver<std::result::Result<Event, notify::Error>>,

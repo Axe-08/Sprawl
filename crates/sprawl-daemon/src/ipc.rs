@@ -25,7 +25,7 @@ impl IpcServer {
             use tokio::net::UnixListener;
             use std::os::unix::fs::PermissionsExt;
             
-            let listener = UnixListener::bind(&self.socket_path)
+            let _listener = UnixListener::bind(&self.socket_path)
                 .map_err(|e| sprawl_core::SprawlError::Other(format!("IPC Bind failed: {}", e)))?;
                 
             // Apply 0600 restrictive permissions per OQ-09
