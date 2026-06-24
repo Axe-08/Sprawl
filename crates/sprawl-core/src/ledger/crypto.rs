@@ -3,7 +3,7 @@ use aes_gcm::{
     Aes256Gcm, Nonce,
 };
 use base64::Engine;
-use rand::RngCore;
+use aes_gcm::aead::rand_core::RngCore;
 use crate::Result;
 
 pub struct FieldEncryptor {

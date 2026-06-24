@@ -1,6 +1,7 @@
 use crate::Result;
 use keyring::Entry;
-use rand::RngCore;
+use aes_gcm::aead::{OsRng, rand_core::RngCore};
+use base64::Engine;
 use zeroize::Zeroize;
 
 pub struct KeyringStore {
@@ -34,7 +35,7 @@ impl KeyringStore {
             }
             Err(keyring::Error::NoEntry) => {
                 let mut key = [0u8; 32];
-                rand::rngs::OsRng.fill_bytes(&mut key);
+                OsRng.fill_bytes(&mut key);
                 let key_b64 = base64::engine::general_purpose::STANDARD.encode(&key);
                 
                 entry.set_password(&key_b64)

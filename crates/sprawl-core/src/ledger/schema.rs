@@ -1,4 +1,4 @@
-use rusqlite::{Connection, Result as SqlResult};
+use rusqlite::Connection;
 use std::path::Path;
 
 pub const CURRENT_SCHEMA_VERSION: i32 = 1;
