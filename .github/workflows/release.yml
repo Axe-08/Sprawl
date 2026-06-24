@@ -1,0 +1,28 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Release
+        run: cargo build --release
+      - name: Binary Size Check
+        run: |
+          SIZE=$(stat -c%s target/release/sprawl-cli 2>/dev/null || stat -f%z target/release/sprawl-cli)
+          MAX=$((45 * 1024 * 1024))
+          echo "Binary size: $SIZE bytes (max: $MAX)"
+          [ "$SIZE" -le "$MAX" ] || (echo "FAIL: binary exceeds 45MB" && exit 1)
+
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}

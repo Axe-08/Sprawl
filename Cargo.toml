@@ -1,0 +1,33 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/*"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+# MSRV: Do NOT pin statically — run `cargo-msrv find` against the actual
+# dependency tree. wasmtime follows a rolling "latest 3 stable Rust releases"
+# policy, making this a moving target. A monthly `cargo msrv verify` CI job
+# catches upward drift. (See OQ-02 resolution.)
+# rust-version = "<determined at implementation time via cargo-msrv find>"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/<org>/sprawl"
+
+[workspace.dependencies]
+# Shared dependency versions — all crates reference these via { workspace = true }
+thiserror = "2"
+anyhow = "1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tokio = { version = "1", features = ["full"] }
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+
+# sprawl-core platform-specific dependencies
+libc = "0.2"
+windows-sys = { version = "0.52", features = ["Win32_System_Threading"] }
