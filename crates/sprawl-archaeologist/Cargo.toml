@@ -6,3 +6,9 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+sprawl-core = { path = "../sprawl-core" }
+sprawl-plugin-host = { path = "../sprawl-plugin-host" }
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true

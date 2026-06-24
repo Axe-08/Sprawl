@@ -11,6 +11,8 @@ wasmtime::component::bindgen!({
     async: true,
 });
 
+pub use exports::sprawl::stack_detector::detector::{StackInfo, Dependency, ReproducibilityVerdict};
+
 pub struct HostState {
     pub wasi_ctx: WasiCtx,
     pub resource_table: ResourceTable,
