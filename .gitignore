@@ -32,7 +32,7 @@ Cargo.lock
 plugins/target/
 plugins/**/target/
 *.wasm.map
-
+Documents/Implementation/*
 # ---------------------
 # IDE / Editor
 # ---------------------
