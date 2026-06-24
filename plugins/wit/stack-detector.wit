@@ -1,0 +1,27 @@
+package sprawl:stack-detector@1.0.0;
+
+interface detector {
+    record dependency {
+        name: string,
+        version-spec: string,
+        is-local-path: bool,
+    }
+
+    record reproducibility-verdict {
+        is-reproducible: bool,
+        evidence: list<string>,
+    }
+
+    record stack-info {
+        ecosystem: string,
+        entry-points: list<string>,
+        dependencies: list<dependency>,
+        reproducibility: reproducibility-verdict,
+    }
+
+    detect: func(project-root: string) -> option<stack-info>;
+}
+
+world stack-detector-plugin {
+    export detector;
+}
