@@ -1,4 +1,3 @@
-use std::path::Path;
 use zeroize::Zeroize;
 use crate::classify::{classify_string, SecretClassification};
 use crate::entropy::shannon_entropy;
@@ -19,7 +18,7 @@ impl LedgerStub {
 }
 
 pub struct SentinelScanner {
-    noise_patterns: Vec<NoisePattern>,
+    _noise_patterns: Vec<NoisePattern>,
     keyring: KeyringStoreStub,
     ledger: LedgerStub,
 }
@@ -27,7 +26,7 @@ pub struct SentinelScanner {
 impl SentinelScanner {
     pub fn new(noise_patterns: Vec<NoisePattern>) -> Self {
         Self {
-            noise_patterns,
+            _noise_patterns: noise_patterns,
             keyring: KeyringStoreStub,
             ledger: LedgerStub,
         }
