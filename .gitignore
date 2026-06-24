@@ -1,0 +1,107 @@
+# =============================================================================
+# Sprawl — .gitignore
+# =============================================================================
+
+# ---------------------
+# Rust / Cargo
+# ---------------------
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+# Note: Cargo.lock IS committed for binary crates (this is a binary).
+# Remove the Cargo.lock line above after `cargo init`.
+# Actually, for binary projects Cargo.lock SHOULD be committed.
+# We list it here as a reminder to un-ignore it after init.
+
+# ---------------------
+# Build artifacts
+# ---------------------
+*.so
+*.dylib
+*.dll
+*.o
+*.a
+*.lib
+*.exe
+*.out
+
+# ---------------------
+# WASM build artifacts (plugin development)
+# ---------------------
+plugins/target/
+plugins/**/target/
+*.wasm.map
+
+# ---------------------
+# IDE / Editor
+# ---------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# ---------------------
+# OS generated
+# ---------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# ---------------------
+# Sprawl runtime data (never commit user state)
+# ---------------------
+# These would exist at ~/.sprawl/ in production,
+# but during development/testing they may appear locally.
+ledger.db
+ledger.db-journal
+ledger.db-wal
+manifest.json
+models/*.gguf
+backups/
+
+# ---------------------
+# Test fixtures (generated, not source)
+# ---------------------
+tests/fixtures/generated/
+tests/tmp/
+test-results/
+coverage/
+*.profraw
+*.profdata
+lcov.info
+tarpaulin-report.html
+
+# ---------------------
+# Documentation build
+# ---------------------
+docs/build/
+site/
+
+# ---------------------
+# Environment / Secrets
+# ---------------------
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+
+# ---------------------
+# Miscellaneous
+# ---------------------
+*.log
+*.bak
+*.tmp
+*.temp
