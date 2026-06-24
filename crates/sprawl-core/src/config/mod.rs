@@ -3,8 +3,7 @@ pub mod predicate;
 pub mod presets;
 
 use crate::Result;
-use self::domain::{NoisePattern, SweepRule, TriageCondition};
-use self::predicate::Predicate;
+use self::domain::{NoisePattern, SweepRule};
 use self::presets::{get_global_preset, get_web_dev_preset, get_ml_engineer_preset};
 
 pub struct LayeredConfig {

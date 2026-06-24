@@ -18,6 +18,11 @@ impl IpcServer {
                 .map_err(|e| sprawl_core::SprawlError::Io(e))?;
         }
 
+        if let Some(parent) = self.socket_path.parent() {
+            std::fs::create_dir_all(parent)
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to create IPC directory: {}", e)))?;
+        }
+
         #[cfg(unix)]
         {
             use tokio::net::UnixListener;
