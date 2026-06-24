@@ -6,3 +6,10 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+sprawl-core = { path = "../sprawl-core" }
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+regex = "1.10"
+uuid.workspace = true
+zeroize = { version = "1", features = ["zeroize_derive"] }
