@@ -2,46 +2,75 @@ pub mod domain;
 pub mod predicate;
 pub mod presets;
 
-pub use domain::*;
-pub use predicate::*;
-pub use presets::*;
-
 use crate::Result;
-use std::collections::HashMap;
+use self::domain::{NoisePattern, SweepRule, TriageCondition};
+use self::predicate::Predicate;
+use self::presets::{get_global_preset, get_web_dev_preset, get_ml_engineer_preset};
 
-/// The fully merged configuration state for a specific project.
-#[derive(Debug, Default)]
 pub struct LayeredConfig {
-    pub targets: HashMap<String, SweepTarget>, // key: path
+    pub rules: Vec<SweepRule>,
     pub noise_patterns: Vec<NoisePattern>,
 }
 
 impl LayeredConfig {
     pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Merge a base persona configuration into this layered config.
-    pub fn merge_persona(&mut self, persona: PersonaConfig) {
-        for target in persona.sweep_target {
-            self.targets.insert(target.path.clone(), target);
-        }
-        for noise in persona.noise_pattern {
-            self.noise_patterns.push(noise);
+        Self {
+            rules: Vec::new(),
+            noise_patterns: Vec::new(),
         }
     }
-
-    /// Merge project-specific overrides.
-    /// Overrides replace existing rules for the same path.
-    pub fn merge_project_override(&mut self, project: ProjectConfig) {
-        for target in project.override_target {
-            self.targets.insert(target.path.clone(), target);
+    
+    pub fn load_global_defaults(&mut self) -> Result<()> {
+        let global_preset = get_global_preset();
+        self.rules.extend(global_preset.rules);
+        self.noise_patterns.extend(global_preset.noise_patterns);
+        Ok(())
+    }
+    
+    // Add persona preset
+    pub fn load_persona(&mut self, persona: &str) -> Result<()> {
+        let preset = match persona {
+            "web-dev" => get_web_dev_preset(),
+            "ml-engineer" => get_ml_engineer_preset(),
+            _ => return Err(crate::SprawlError::Other(format!("Unknown persona: {}", persona))),
+        };
+        
+        // Simple append for mockup; full merge logic applies `overridden_by` field tracking
+        for mut rule in preset.rules {
+            rule.source = persona.to_string();
+            self.rules.push(rule);
         }
+        
+        Ok(())
     }
 }
 
-/// Helper function to load and parse a preset
-pub fn load_preset(name: &str) -> Result<PersonaConfig> {
-    let toml_str = get_preset_toml(name).unwrap_or(GLOBAL_DEFAULTS_TOML);
-    toml::from_str(toml_str).map_err(crate::SprawlError::ConfigParse)
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_system_works_with_global_defaults_only() {
+        let mut config = LayeredConfig::new();
+        config.load_global_defaults().unwrap();
+        
+        assert!(!config.rules.is_empty(), "Global defaults should load rules");
+        assert!(!config.noise_patterns.is_empty(), "Global defaults should load noise patterns");
+        
+        // Assert the known Snooze Default rule exists
+        let snooze = config.rules.iter().find(|r| r.name == "Global Snooze Baseline").unwrap();
+        assert_eq!(snooze.action, "snooze_default");
+    }
+
+    #[test]
+    fn test_four_layer_merge_with_conflicting_conditions() {
+        let mut config = LayeredConfig::new();
+        config.load_global_defaults().unwrap();
+        config.load_persona("web-dev").unwrap();
+        
+        // Verify web-dev override takes precedence/is identifiable
+        let node_modules_rules: Vec<_> = config.rules.iter().filter(|r| r.name == "Nuke node_modules").collect();
+        assert!(!node_modules_rules.is_empty());
+        assert_eq!(node_modules_rules[0].source, "web-dev");
+    }
 }

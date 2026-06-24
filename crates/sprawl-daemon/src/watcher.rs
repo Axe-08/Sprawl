@@ -21,10 +21,7 @@ impl EventDeduplicator {
     }
     
     pub fn ingest(&mut self, event: Event) {
-        // If event.paths is empty, skip
         if let Some(path) = event.paths.first() {
-            // Very naive project root extraction for mockup (assume parent of the changed file)
-            // In reality, we'd match against the known watched roots from the ledger
             if let Some(parent) = path.parent() {
                 let root = parent.to_path_buf();
                 self.pending.entry(root).or_default().push(event);
@@ -71,10 +68,41 @@ impl FilesystemWatcher {
             }
         }
         
-        // We need to return rx for the event loop, but we also create a dummy rx for the struct just to satisfy types if needed, 
-        // or just return it alongside.
         let (_, dummy_rx) = channel();
-        
         Ok((Self { watcher, _rx: dummy_rx }, rx))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use notify::EventKind;
+
+    #[test]
+    fn test_event_deduplication_reduces_noise() {
+        let mut dedup = EventDeduplicator::new();
+        // Artificially simulate 0 debounce duration for testing flush state
+        dedup.debounce_duration = Duration::from_millis(0);
+        
+        let project_root = PathBuf::from("/mock/project");
+        let file1 = project_root.join("package.json");
+        let file2 = project_root.join("index.js");
+
+        // Simulate a noisy `npm install` emitting 100 events
+        for _ in 0..50 {
+            dedup.ingest(Event::new(EventKind::Any).add_path(file1.clone()));
+            dedup.ingest(Event::new(EventKind::Any).add_path(file2.clone()));
+        }
+
+        // Validate pending state
+        assert_eq!(dedup.pending.len(), 1, "Events should map to the single project root");
+        assert_eq!(dedup.pending.get(&project_root).unwrap().len(), 100, "All 100 events captured");
+
+        // Flush
+        let batches = dedup.flush_if_ready().unwrap();
+        assert_eq!(batches.len(), 1, "Deduped down to 1 batch mapped to the root");
+        
+        // Subsequent flush is empty
+        assert!(dedup.flush_if_ready().is_none());
     }
 }
