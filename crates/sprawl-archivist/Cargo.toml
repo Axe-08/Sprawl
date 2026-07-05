@@ -6,3 +6,11 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+sprawl-core = { path = "../sprawl-core" }
+anyhow.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+tempfile = "3.10"

@@ -1,0 +1,34 @@
+[package]
+name = "sprawl-integration-tests"
+version.workspace = true
+edition.workspace = true
+publish = false
+
+[lib]
+name = "fixtures"
+path = "fixtures/mod.rs"
+
+[[test]]
+name = "matrix_test"
+path = "safety_gate/matrix_test.rs"
+
+[[test]]
+name = "daemon_lifecycle_test"
+path = "integration/daemon_lifecycle_test.rs"
+
+[[test]]
+name = "sweeper_restore_test"
+path = "integration/sweeper_restore_test.rs"
+
+[[test]]
+name = "sentinel_scan_test"
+path = "integration/sentinel_scan_test.rs"
+
+[dependencies]
+sprawl-core = { path = "../crates/sprawl-core" }
+sprawl-sweeper = { path = "../crates/sprawl-sweeper" }
+sprawl-sentinel = { path = "../crates/sprawl-sentinel" }
+sprawl-daemon = { path = "../crates/sprawl-daemon" }
+tempfile = "3.10"
+tokio = { workspace = true }
+anyhow = { workspace = true }
