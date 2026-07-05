@@ -33,22 +33,19 @@ impl DaemonContext {
         #[cfg(unix)]
         {
             use daemonize::Daemonize;
-            let log_file = std::fs::File::create(sprawl_data_dir()?.join("sprawl.log"))
-                .map_err(|e| sprawl_core::SprawlError::Io(e))?;
-                
+            let data_dir = sprawl_data_dir()?;
+            
             let daemonize = Daemonize::new()
                 .pid_file(&self.pid_file)
                 .chown_pid_file(true)
-                .working_directory(sprawl_data_dir()?)
-                .stdout(log_file.try_clone().unwrap())
-                .stderr(log_file);
+                .working_directory(data_dir);
                 
             match daemonize.start() {
                 Ok(_) => {
                     tracing::info!("Daemon started successfully");
-                    return run_loop();
+                    run_loop()
                 }
-                Err(e) => return Err(sprawl_core::SprawlError::Other(format!("Daemonize failed: {}", e))),
+                Err(e) => Err(sprawl_core::SprawlError::Other(format!("Daemonize failed: {}", e))),
             }
         }
         

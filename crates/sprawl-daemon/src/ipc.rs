@@ -15,7 +15,7 @@ impl IpcServer {
     pub async fn bind(&self) -> Result<()> {
         if self.socket_path.exists() {
             std::fs::remove_file(&self.socket_path)
-                .map_err(|e| sprawl_core::SprawlError::Io(e))?;
+                .map_err(sprawl_core::SprawlError::Io)?;
         }
 
         if let Some(parent) = self.socket_path.parent() {
@@ -32,11 +32,11 @@ impl IpcServer {
                 .map_err(|e| sprawl_core::SprawlError::Other(format!("IPC Bind failed: {}", e)))?;
                 
             let mut perms = std::fs::metadata(&self.socket_path)
-                .map_err(|e| sprawl_core::SprawlError::Io(e))?
+                .map_err(sprawl_core::SprawlError::Io)?
                 .permissions();
             perms.set_mode(0o600);
             std::fs::set_permissions(&self.socket_path, perms)
-                .map_err(|e| sprawl_core::SprawlError::Io(e))?;
+                .map_err(sprawl_core::SprawlError::Io)?;
         }
         
         Ok(())

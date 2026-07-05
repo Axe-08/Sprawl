@@ -14,7 +14,15 @@ impl KeyringStore {
             service_name: "sprawl".to_string(),
         }
     }
+}
 
+impl Default for KeyringStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl KeyringStore {
     /// Get or generate the master encryption key for ledger field encryption.
     pub fn get_or_create_master_key(&self) -> Result<[u8; 32]> {
         let entry = Entry::new(&self.service_name, "master-key")
@@ -36,7 +44,7 @@ impl KeyringStore {
             Err(keyring::Error::NoEntry) => {
                 let mut key = [0u8; 32];
                 OsRng.fill_bytes(&mut key);
-                let key_b64 = base64::engine::general_purpose::STANDARD.encode(&key);
+                let key_b64 = base64::engine::general_purpose::STANDARD.encode(key);
                 
                 entry.set_password(&key_b64)
                     .map_err(|e| crate::SprawlError::Other(format!("Failed to save master key to OS keyring: {}", e)))?;

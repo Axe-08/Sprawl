@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use sprawl_core::platform::sprawl_data_dir;

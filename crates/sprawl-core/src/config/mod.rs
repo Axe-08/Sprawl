@@ -18,7 +18,15 @@ impl LayeredConfig {
             noise_patterns: Vec::new(),
         }
     }
-    
+}
+
+impl Default for LayeredConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl LayeredConfig {
     pub fn load_global_defaults(&mut self) -> Result<()> {
         let global_preset = get_global_preset();
         self.rules.extend(global_preset.rules);

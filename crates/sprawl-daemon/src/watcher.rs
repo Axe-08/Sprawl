@@ -19,7 +19,15 @@ impl EventDeduplicator {
             last_flush: Instant::now(),
         }
     }
-    
+}
+
+impl Default for EventDeduplicator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EventDeduplicator {
     pub fn ingest(&mut self, event: Event) {
         if let Some(path) = event.paths.first() {
             if let Some(parent) = path.parent() {

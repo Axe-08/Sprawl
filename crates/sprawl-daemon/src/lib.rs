@@ -27,10 +27,8 @@ pub async fn run_daemon_loop() -> Result<()> {
     // For this mockup, we would use tokio channels or select over the blocking notify rx.
     loop {
         // Read events...
-        if let Ok(event) = rx.try_recv() {
-            if let Ok(e) = event {
-                dedup.ingest(e);
-            }
+        if let Ok(Ok(e)) = rx.try_recv() {
+            dedup.ingest(e);
         }
         
         // Flush deduplicator...

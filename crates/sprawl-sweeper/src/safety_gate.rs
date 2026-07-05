@@ -37,7 +37,15 @@ impl SafetyGate {
     pub fn new() -> Self {
         Self
     }
+}
 
+impl Default for SafetyGate {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SafetyGate {
     /// Independently verify reproducibility for a project directory.
     pub fn verify(&self, project_root: &Path, ecosystem: &Ecosystem) -> CoreReproducibilityCheck {
         let lockfile = self.find_lockfile(project_root, ecosystem);

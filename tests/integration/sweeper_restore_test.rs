@@ -43,7 +43,7 @@ fn test_archive_and_restore_identity() {
     assert!(metadata.file_type().is_symlink());
 
     // 3. Restore it
-    engine.restore("my-project").unwrap();
+    engine.restore(&project_path, &archive_path.join("my-project")).unwrap();
     
     // Verify it is a real directory again
     let metadata_after = fs::symlink_metadata(&project_path).unwrap();

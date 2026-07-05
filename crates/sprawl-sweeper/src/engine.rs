@@ -47,7 +47,15 @@ impl SweeperEngine {
             _ledger: LedgerConnection,
         }
     }
+}
 
+impl Default for SweeperEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl SweeperEngine {
     pub fn snooze(&self, _item: &TriageItem, _days: u32) -> Result<()> {
         // Update ledger to ignore for N days
         Ok(())
@@ -109,8 +117,13 @@ impl SweeperEngine {
         }
     }
 
-    pub fn restore(&self, _project_name: &str) -> Result<()> {
-        // Reads manifest, reverses symlinks, moves back
+    pub fn restore(&self, target_path: &Path, archive_path: &Path) -> Result<()> {
+        if target_path.exists() {
+            fs::remove_file(target_path)?; // Remove symlink
+        }
+        if archive_path.exists() {
+            fs::rename(archive_path, target_path)?; // Move back
+        }
         Ok(())
     }
 }
