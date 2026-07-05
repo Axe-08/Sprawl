@@ -1,4 +1,3 @@
-use std::fs;
 use tempfile::tempdir;
 use sprawl_sweeper::safety_gate::{SafetyGate, NukeEligibility, Ecosystem, ReproducibilityVerdict, nuke_eligible};
 use fixtures::*;

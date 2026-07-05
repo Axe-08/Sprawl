@@ -55,7 +55,7 @@ impl DaemonContext {
             // For now we just write the PID and run in current terminal as a mock daemon.
             let pid = std::process::id();
             std::fs::write(&self.pid_file, pid.to_string())
-                .map_err(|e| sprawl_core::SprawlError::Io(e))?;
+                .map_err(sprawl_core::SprawlError::Io)?;
             tracing::info!("Daemon started successfully (foreground fallback for Windows/non-unix)");
             let res = run_loop();
             let _ = std::fs::remove_file(&self.pid_file);
@@ -69,7 +69,7 @@ impl DaemonContext {
         }
         
         let pid_str = std::fs::read_to_string(&self.pid_file)
-            .map_err(|e| sprawl_core::SprawlError::Io(e))?;
+            .map_err(sprawl_core::SprawlError::Io)?;
             
         let _pid: u32 = pid_str.trim().parse()
             .map_err(|_| sprawl_core::SprawlError::Other("Invalid PID file format".into()))?;

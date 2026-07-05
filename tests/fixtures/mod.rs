@@ -1,6 +1,5 @@
 use std::fs;
 use std::path::Path;
-use tempfile::TempDir;
 
 pub fn create_node_with_lockfile(root: &Path) {
     fs::write(root.join("package.json"), r#"{"dependencies":{"express":"^4.0.0"}}"#).unwrap();

@@ -1,6 +1,4 @@
-use std::time::Duration;
 use sprawl_daemon::ipc::IpcServer;
-use tokio::time::timeout;
 
 #[tokio::test]
 async fn test_daemon_lifecycle() {

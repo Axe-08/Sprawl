@@ -23,7 +23,15 @@ impl Bundler {
     pub fn new() -> Self {
         Self {}
     }
+}
 
+impl Default for Bundler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Bundler {
     /// Recursively bundle a directory, respecting .sprawl.toml and .gitignore.
     /// Uses tree-sitter to strip AST comments and blank lines if token limits are approached.
     pub fn bundle_directory(&self, _dir: &Path, _opts: &BundleOptions) -> Result<String> {

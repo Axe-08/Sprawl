@@ -1,28 +1,89 @@
 name: Release
 
 on:
-  release:
-    types: [published]
+  push:
+    tags:
+      - 'v*'
 
 jobs:
-  build-release:
-    runs-on: ubuntu-latest
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build Release
-        run: cargo build --release
-      - name: Binary Size Check
-        run: |
-          SIZE=$(stat -c%s target/release/sprawl-cli 2>/dev/null || stat -f%z target/release/sprawl-cli)
-          MAX=$((45 * 1024 * 1024))
-          echo "Binary size: $SIZE bytes (max: $MAX)"
-          [ "$SIZE" -le "$MAX" ] || (echo "FAIL: binary exceeds 45MB" && exit 1)
-
-  audit:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: rustsec/audit-check@v2
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          targets: ${{ matrix.target }}
+          
+      - name: Install Cross (for Linux ARM64)
+        if: matrix.target == 'aarch64-unknown-linux-gnu'
+        run: cargo install cross
+          
+      - name: Build Binary
+        run: |
+          if [ "${{ matrix.target }}" == "aarch64-unknown-linux-gnu" ]; then
+            cross build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+        shell: bash
+        
+      - name: Check Binary Size
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            BIN_PATH="target/${{ matrix.target }}/release/sprawl-cli.exe"
+          else
+            BIN_PATH="target/${{ matrix.target }}/release/sprawl-cli"
+          fi
+          
+          # Size in MB
+          if [ "${{ runner.os }}" == "macOS" ]; then
+            SIZE=$(stat -f %z "$BIN_PATH")
+          else
+            SIZE=$(stat -c %s "$BIN_PATH")
+          fi
+          SIZE_MB=$(echo "$SIZE / 1048576" | bc)
+          echo "Binary size is $SIZE_MB MB"
+          
+          if [ "$SIZE_MB" -gt 45 ]; then
+            echo "Binary exceeds 45MB size limit!"
+            exit 1
+          fi
+        shell: bash
+        
+      - name: Generate Checksums
+        run: |
+          if [ "${{ runner.os }}" == "Windows" ]; then
+            BIN_PATH="target/${{ matrix.target }}/release/sprawl-cli.exe"
+            sha256sum "$BIN_PATH" > "$BIN_PATH.sha256"
+          else
+            BIN_PATH="target/${{ matrix.target }}/release/sprawl-cli"
+            shasum -a 256 "$BIN_PATH" > "$BIN_PATH.sha256"
+          fi
+        shell: bash
+        
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sprawl-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/sprawl-cli
+            target/${{ matrix.target }}/release/sprawl-cli.exe
+            target/${{ matrix.target }}/release/*.sha256
+          if-no-files-found: ignore

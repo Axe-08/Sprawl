@@ -1,5 +1,4 @@
 use std::fs;
-use std::path::PathBuf;
 use tempfile::tempdir;
 use sprawl_sweeper::engine::{SweeperEngine, TriageItem, ProjectId};
 use fixtures::create_node_with_lockfile;
