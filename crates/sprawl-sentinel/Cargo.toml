@@ -13,3 +13,7 @@ tracing.workspace = true
 regex = "1.10"
 uuid.workspace = true
 zeroize = { version = "1", features = ["zeroize_derive"] }
+sprawl-inference = { path = "../sprawl-inference" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

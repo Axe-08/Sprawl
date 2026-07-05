@@ -6,3 +6,6 @@ license.workspace = true
 repository.workspace = true
 
 [dependencies]
+clap = { version = "4.4", features = ["derive"] }
+uuid = { version = "1.8", features = ["v4"] }
+sprawl-sentinel = { path = "../sprawl-sentinel" }
