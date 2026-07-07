@@ -48,10 +48,14 @@ impl App {
             },
             sweeper: SweeperInboxState {
                 selected_index: 0,
+                // Demo items injected at startup from sprawl-dev; production starts empty
+                #[cfg(feature = "demo-data")]
                 items: vec![
                     "~/Projects/old-api/node_modules   387MB   idle 45d   [X] Nuke  [A] Archive  [S] Snooze".into(),
-                    "⚠️ Config Overridden by Project Local".into()
+                    "[!] Config Overridden by Project Local".into(),
                 ],
+                #[cfg(not(feature = "demo-data"))]
+                items: Vec::new(),
             },
             sentinel: SentinelInboxState {},
             search: SearchState {},
