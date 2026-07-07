@@ -1,6 +1,8 @@
-use tempfile::tempdir;
-use sprawl_sweeper::safety_gate::{SafetyGate, NukeEligibility, Ecosystem, ReproducibilityVerdict, nuke_eligible};
 use fixtures::*;
+use sprawl_sweeper::safety_gate::{
+    nuke_eligible, Ecosystem, NukeEligibility, ReproducibilityVerdict, SafetyGate,
+};
+use tempfile::tempdir;
 
 // We use the fixtures exported from the `fixtures` lib via `tests/Cargo.toml`
 fn mock_verdict(eligible: bool) -> ReproducibilityVerdict {

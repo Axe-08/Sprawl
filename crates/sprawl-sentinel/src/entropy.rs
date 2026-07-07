@@ -25,7 +25,7 @@ mod tests {
     #[test]
     fn test_entropy_of_high_entropy_string() {
         // A truly random base64 string should have an entropy close to 6.0
-        let s = "Vq1B9xLz4M6nPw3Xm0R8bQv7Kj2YcF5t"; 
+        let s = "Vq1B9xLz4M6nPw3Xm0R8bQv7Kj2YcF5t";
         assert!(shannon_entropy(s) > 4.5);
     }
 }

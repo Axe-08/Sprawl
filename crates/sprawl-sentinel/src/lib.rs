@@ -1,8 +1,8 @@
-pub mod entropy;
-pub mod scanner;
 pub mod classify;
+pub mod entropy;
 pub mod llm;
+pub mod scanner;
 pub mod verify;
 
-pub use scanner::SentinelScanner;
 pub use classify::{Classification, SecretClassification};
+pub use scanner::SentinelScanner;

@@ -1,9 +1,9 @@
-use notify::{Watcher, RecommendedWatcher, RecursiveMode, Event};
+use notify::{Event, RecommendedWatcher, RecursiveMode, Watcher};
+use sprawl_core::Result;
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::mpsc::{channel, Receiver};
-use std::collections::HashMap;
 use std::time::{Duration, Instant};
-use sprawl_core::Result;
 
 pub struct EventDeduplicator {
     pub pending: HashMap<PathBuf, Vec<Event>>,
@@ -36,7 +36,7 @@ impl EventDeduplicator {
             }
         }
     }
-    
+
     pub fn flush_if_ready(&mut self) -> Option<HashMap<PathBuf, Vec<Event>>> {
         if self.last_flush.elapsed() >= self.debounce_duration {
             let ready = std::mem::take(&mut self.pending);
@@ -56,18 +56,22 @@ pub struct FilesystemWatcher {
 }
 
 impl FilesystemWatcher {
-    pub fn new(project_roots: &[PathBuf], config_paths: &[PathBuf]) -> Result<(Self, Receiver<std::result::Result<Event, notify::Error>>)> {
+    pub fn new(
+        project_roots: &[PathBuf],
+        config_paths: &[PathBuf],
+    ) -> Result<(Self, Receiver<std::result::Result<Event, notify::Error>>)> {
         let (tx, rx) = channel();
-        
-        let mut watcher = RecommendedWatcher::new(tx, notify::Config::default())
-            .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to initialize watcher: {}", e)))?;
-            
+
+        let mut watcher = RecommendedWatcher::new(tx, notify::Config::default()).map_err(|e| {
+            sprawl_core::SprawlError::Other(format!("Failed to initialize watcher: {}", e))
+        })?;
+
         for root in project_roots {
             if let Err(e) = watcher.watch(root, RecursiveMode::NonRecursive) {
                 tracing::warn!("Watcher failed on root {}: {}", root.display(), e);
             }
         }
-        
+
         for config in config_paths {
             if config.exists() {
                 if let Err(e) = watcher.watch(config, RecursiveMode::NonRecursive) {
@@ -75,9 +79,15 @@ impl FilesystemWatcher {
                 }
             }
         }
-        
+
         let (_, dummy_rx) = channel();
-        Ok((Self { watcher, _rx: dummy_rx }, rx))
+        Ok((
+            Self {
+                watcher,
+                _rx: dummy_rx,
+            },
+            rx,
+        ))
     }
 }
 
@@ -91,7 +101,7 @@ mod tests {
         let mut dedup = EventDeduplicator::new();
         // Artificially simulate 0 debounce duration for testing flush state
         dedup.debounce_duration = Duration::from_millis(0);
-        
+
         let project_root = PathBuf::from("/mock/project");
         let file1 = project_root.join("package.json");
         let file2 = project_root.join("index.js");
@@ -103,13 +113,25 @@ mod tests {
         }
 
         // Validate pending state
-        assert_eq!(dedup.pending.len(), 1, "Events should map to the single project root");
-        assert_eq!(dedup.pending.get(&project_root).unwrap().len(), 100, "All 100 events captured");
+        assert_eq!(
+            dedup.pending.len(),
+            1,
+            "Events should map to the single project root"
+        );
+        assert_eq!(
+            dedup.pending.get(&project_root).unwrap().len(),
+            100,
+            "All 100 events captured"
+        );
 
         // Flush
         let batches = dedup.flush_if_ready().unwrap();
-        assert_eq!(batches.len(), 1, "Deduped down to 1 batch mapped to the root");
-        
+        assert_eq!(
+            batches.len(),
+            1,
+            "Deduped down to 1 batch mapped to the root"
+        );
+
         // Subsequent flush is empty
         assert!(dedup.flush_if_ready().is_none());
     }

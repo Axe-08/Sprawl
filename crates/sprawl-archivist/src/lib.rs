@@ -1,7 +1,7 @@
+use sprawl_core::platform::sprawl_data_dir;
 use std::path::Path;
 use std::thread::JoinHandle;
 use std::time::Duration;
-use sprawl_core::platform::sprawl_data_dir;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -17,14 +17,14 @@ pub enum ArchivistError {
 pub type Result<T> = std::result::Result<T, ArchivistError>;
 
 pub struct IndexedChunk {
-    pub id: String,                // UUID
+    pub id: String, // UUID
     pub project_id: String,
-    pub file_path: String,         // relative to project root
-    pub chunk_text: String,        // the actual code/text chunk
+    pub file_path: String,  // relative to project root
+    pub chunk_text: String, // the actual code/text chunk
     pub chunk_start_line: u32,
     pub chunk_end_line: u32,
-    pub embedding: Vec<f32>,       // vector from embedding model
-    pub indexed_at: String,        // ISO 8601
+    pub embedding: Vec<f32>, // vector from embedding model
+    pub indexed_at: String,  // ISO 8601
 }
 
 pub struct SearchResult {
@@ -62,19 +62,17 @@ impl MockDatabase {
     pub fn connect(_path: &str) -> Result<Self> {
         Ok(MockDatabase)
     }
-    
+
     pub fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
         // Return dummy results for testing
-        Ok(vec![
-            SearchResult {
-                project_id: "test_proj".into(),
-                file_path: "src/main.rs".into(),
-                chunk_text: "fn main() { println!(\"Hello\"); }".into(),
-                start_line: 1,
-                end_line: 3,
-                similarity_score: 0.95,
-            }
-        ])
+        Ok(vec![SearchResult {
+            project_id: "test_proj".into(),
+            file_path: "src/main.rs".into(),
+            chunk_text: "fn main() { println!(\"Hello\"); }".into(),
+            start_line: 1,
+            end_line: 3,
+            similarity_score: 0.95,
+        }])
     }
 }
 
@@ -88,16 +86,19 @@ impl Archivist {
         let db_path = sprawl_data_dir()
             .map_err(|e| ArchivistError::Database(e.to_string()))?
             .join("vector_store");
-            
+
         std::fs::create_dir_all(&db_path)?;
-        
+
         let db = MockDatabase::connect(&db_path.to_string_lossy())?;
-        Ok(Self { db, indexer_handle: None })
+        Ok(Self {
+            db,
+            indexer_handle: None,
+        })
     }
 
     pub fn chunk_file(path: &Path) -> Result<Vec<TextChunk>> {
         let content = std::fs::read(path)?;
-        
+
         // Skip binary check (null bytes in first 8KB)
         let check_len = std::cmp::min(content.len(), 8192);
         if content[..check_len].contains(&0) {
@@ -122,7 +123,7 @@ impl Archivist {
                     start_line,
                     end_line: current_line,
                 });
-                // In production, implement 64-token overlap. 
+                // In production, implement 64-token overlap.
                 // For MVP, reset entirely.
                 current_chunk.clear();
                 start_line = current_line + 1;
@@ -145,7 +146,7 @@ impl Archivist {
     pub fn start_background_indexer<R: RamMonitor + 'static>(&mut self, monitor: R) -> Result<()> {
         let handle = std::thread::spawn(move || {
             // In a real environment, set thread priority: set_low_priority().ok();
-            
+
             // Limit loop iterations for testing to prevent infinite loop hanging tests
             #[cfg(test)]
             let mut test_iters = 0;
@@ -154,7 +155,9 @@ impl Archivist {
                 #[cfg(test)]
                 {
                     test_iters += 1;
-                    if test_iters > 2 { break; }
+                    if test_iters > 2 {
+                        break;
+                    }
                 }
 
                 let available = monitor.available_ram_mb();
@@ -168,7 +171,7 @@ impl Archivist {
                 std::thread::sleep(Duration::from_millis(10)); // normally 300s
             }
         });
-        
+
         self.indexer_handle = Some(handle);
         Ok(())
     }
@@ -176,7 +179,7 @@ impl Archivist {
     pub async fn search(&self, _query: &str, top_k: usize) -> Result<Vec<SearchResult>> {
         // 1. Embed query
         let mock_embedding = vec![0.1; 384];
-        
+
         // 2. Vector similarity search
         self.db.search(&mock_embedding, top_k)
     }
@@ -185,24 +188,28 @@ impl Archivist {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::NamedTempFile;
     use std::io::Write;
+    use tempfile::NamedTempFile;
 
     struct LowRamMonitor;
     impl RamMonitor for LowRamMonitor {
-        fn available_ram_mb(&self) -> u64 { 512 }
+        fn available_ram_mb(&self) -> u64 {
+            512
+        }
     }
 
     struct HighRamMonitor;
     impl RamMonitor for HighRamMonitor {
-        fn available_ram_mb(&self) -> u64 { 4096 }
+        fn available_ram_mb(&self) -> u64 {
+            4096
+        }
     }
 
     #[test]
     fn test_indexer_suspends_when_ram_is_low() {
         let mut archivist = Archivist::new().unwrap();
         archivist.start_background_indexer(LowRamMonitor).unwrap();
-        
+
         // Wait for thread to complete its limited test iterations
         if let Some(handle) = archivist.indexer_handle.take() {
             handle.join().unwrap();
@@ -215,7 +222,7 @@ mod tests {
         let mut file = NamedTempFile::new().unwrap();
         // write null byte
         file.write_all(&[0, 1, 2, 3]).unwrap();
-        
+
         let chunks = Archivist::chunk_file(file.path()).unwrap();
         assert!(chunks.is_empty());
     }
@@ -223,12 +230,14 @@ mod tests {
     #[test]
     fn test_chunk_file_splits_text() {
         let mut file = NamedTempFile::new().unwrap();
-        
+
         // Generate enough text to exceed 512 "tokens"
         let mut content = String::new();
         for i in 0..600 {
             content.push_str("word ");
-            if i % 10 == 0 { content.push('\n'); }
+            if i % 10 == 0 {
+                content.push('\n');
+            }
         }
         file.write_all(content.as_bytes()).unwrap();
 
@@ -240,7 +249,7 @@ mod tests {
     async fn test_search_returns_relevant_results() {
         let archivist = Archivist::new().unwrap();
         let results = archivist.search("query", 5).await.unwrap();
-        
+
         assert!(!results.is_empty());
         assert_eq!(results[0].file_path, "src/main.rs");
     }

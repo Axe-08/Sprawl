@@ -36,7 +36,9 @@ impl MigrationManager {
 
     pub fn migrate_up(&self, context: &mut MigrationContext) -> Result<(), String> {
         for migration in &self.migrations {
-            if migration.version() > context.current_version && migration.version() <= context.target_version {
+            if migration.version() > context.current_version
+                && migration.version() <= context.target_version
+            {
                 migration.up(context)?;
                 context.current_version = migration.version();
             }

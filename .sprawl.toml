@@ -1,0 +1,4 @@
+[project]
+name = "sprawl"
+ecosystem = "rust"
+frameworks = ["tokio", "clap"]

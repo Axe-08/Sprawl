@@ -1,7 +1,7 @@
-use zeroize::Zeroize;
 use crate::classify::{classify_string, SecretClassification};
 use crate::entropy::shannon_entropy;
 use sprawl_core::config::domain::NoisePattern;
+use zeroize::Zeroize;
 
 // Stubbed dependencies for M10 scaffold. Will map to actual implementations later.
 pub struct KeyringStoreStub;
@@ -51,7 +51,7 @@ impl SentinelScanner {
                 let _hash = "mock_sha256_hash"; // Implementation detail
                 let keyring_ref = self.keyring.vault_secret(&raw_value);
                 self.ledger.save_secret(_hash, &keyring_ref);
-                
+
                 // Zeroize raw string securely
                 raw_value.zeroize();
             }
@@ -75,12 +75,12 @@ mod tests {
         // Technically this tests that the method compiles and runs without panicking.
         // A direct memory check is difficult in safe Rust.
         let scanner = SentinelScanner::new(vec![]);
-        
+
         let mut fake_stripe_key = "sk_live_".to_string();
         for _ in 0..30 {
             fake_stripe_key.push('A');
         }
-        
+
         scanner.scan_string(fake_stripe_key);
         // If it compiles and runs without use-after-free or panic, zeroize succeeded.
     }

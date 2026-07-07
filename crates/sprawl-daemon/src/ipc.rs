@@ -14,23 +14,23 @@ impl IpcServer {
 
     pub async fn bind(&self) -> Result<()> {
         if self.socket_path.exists() {
-            std::fs::remove_file(&self.socket_path)
-                .map_err(sprawl_core::SprawlError::Io)?;
+            std::fs::remove_file(&self.socket_path).map_err(sprawl_core::SprawlError::Io)?;
         }
 
         if let Some(parent) = self.socket_path.parent() {
-            std::fs::create_dir_all(parent)
-                .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to create IPC directory: {}", e)))?;
+            std::fs::create_dir_all(parent).map_err(|e| {
+                sprawl_core::SprawlError::Other(format!("Failed to create IPC directory: {}", e))
+            })?;
         }
 
         #[cfg(unix)]
         {
-            use tokio::net::UnixListener;
             use std::os::unix::fs::PermissionsExt;
-            
+            use tokio::net::UnixListener;
+
             let _listener = UnixListener::bind(&self.socket_path)
                 .map_err(|e| sprawl_core::SprawlError::Other(format!("IPC Bind failed: {}", e)))?;
-                
+
             let mut perms = std::fs::metadata(&self.socket_path)
                 .map_err(sprawl_core::SprawlError::Io)?
                 .permissions();
@@ -38,7 +38,7 @@ impl IpcServer {
             std::fs::set_permissions(&self.socket_path, perms)
                 .map_err(sprawl_core::SprawlError::Io)?;
         }
-        
+
         Ok(())
     }
 }
@@ -51,17 +51,21 @@ mod tests {
     #[cfg(unix)]
     async fn test_ipc_socket_creation_and_permissions() {
         use std::os::unix::fs::PermissionsExt;
-        
+
         // Mock the data dir by temporarily setting HOME to a tempdir
         let temp_dir = tempfile::tempdir().unwrap();
         std::env::set_var("HOME", temp_dir.path());
-        
+
         let server = IpcServer::new().unwrap();
         assert!(server.bind().await.is_ok());
-        
+
         // Validate 0600 permissions
         let metadata = std::fs::metadata(&server.socket_path).unwrap();
         let mode = metadata.permissions().mode();
-        assert_eq!(mode & 0o777, 0o600, "Socket permissions must be strictly 0600");
+        assert_eq!(
+            mode & 0o777,
+            0o600,
+            "Socket permissions must be strictly 0600"
+        );
     }
 }

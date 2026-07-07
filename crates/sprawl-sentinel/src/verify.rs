@@ -1,5 +1,5 @@
-use uuid::Uuid;
 use sprawl_core::Result;
+use uuid::Uuid;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum VerificationStatus {
@@ -11,14 +11,19 @@ pub enum VerificationStatus {
 pub fn verify_mcp(secret_id: Uuid) -> Result<VerificationStatus> {
     // 1. Simulate checking if an MCP server is configured.
     // Core daemon NEVER makes outbound network calls itself.
-    tracing::info!("Delegating verification for secret {} to MCP router", secret_id);
+    tracing::info!(
+        "Delegating verification for secret {} to MCP router",
+        secret_id
+    );
 
-    // M15 Stub: We return a simulated response because the full MCP SDK integration 
-    // will be part of a later ecosystem milestone. 
-    
+    // M15 Stub: We return a simulated response because the full MCP SDK integration
+    // will be part of a later ecosystem milestone.
+
     // Check if it's a known stub UUID for tests
     if secret_id == Uuid::nil() {
-        return Err(sprawl_core::SprawlError::Other("MCP server not installed or unavailable".into()));
+        return Err(sprawl_core::SprawlError::Other(
+            "MCP server not installed or unavailable".into(),
+        ));
     }
 
     Ok(VerificationStatus::Valid)

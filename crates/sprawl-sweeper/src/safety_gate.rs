@@ -52,9 +52,7 @@ impl SafetyGate {
         let patch_dirs = self.find_patch_dirs(project_root);
         let local_deps = self.find_local_path_deps(project_root, ecosystem);
 
-        let is_reproducible = lockfile.is_some()
-            && patch_dirs.is_empty()
-            && local_deps.is_empty();
+        let is_reproducible = lockfile.is_some() && patch_dirs.is_empty() && local_deps.is_empty();
 
         let veto_reason = if lockfile.is_none() {
             Some("No lockfile found".into())
@@ -78,13 +76,25 @@ impl SafetyGate {
 
     fn find_lockfile(&self, project_root: &Path, ecosystem: &Ecosystem) -> Option<PathBuf> {
         let lockfiles = match ecosystem {
-            Ecosystem::Node => vec!["package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb"],
+            Ecosystem::Node => vec![
+                "package-lock.json",
+                "yarn.lock",
+                "pnpm-lock.yaml",
+                "bun.lockb",
+            ],
             Ecosystem::Rust => vec!["Cargo.lock"],
             Ecosystem::Python => vec!["poetry.lock", "Pipfile.lock", "requirements.txt"],
             Ecosystem::Go => vec!["go.sum"],
             Ecosystem::Unknown => vec![
-                "package-lock.json", "yarn.lock", "pnpm-lock.yaml", "bun.lockb",
-                "Cargo.lock", "poetry.lock", "Pipfile.lock", "requirements.txt", "go.sum",
+                "package-lock.json",
+                "yarn.lock",
+                "pnpm-lock.yaml",
+                "bun.lockb",
+                "Cargo.lock",
+                "poetry.lock",
+                "Pipfile.lock",
+                "requirements.txt",
+                "go.sum",
             ],
         };
 
@@ -111,7 +121,7 @@ impl SafetyGate {
 
     fn find_local_path_deps(&self, project_root: &Path, _ecosystem: &Ecosystem) -> Vec<String> {
         let mut local_deps = Vec::new();
-        // Naive parser for mock/MVP. In production, this would do a shallow read 
+        // Naive parser for mock/MVP. In production, this would do a shallow read
         // of package.json / Cargo.toml to detect local linkages.
         let pkg_json = project_root.join("package.json");
         if pkg_json.exists() {
@@ -185,7 +195,10 @@ mod tests {
         // 1. Lockfile, no patches, plugin says true -> Nuke enabled
         let plugin = Some(mock_verdict(true));
         let core = mock_check(true, None);
-        assert_eq!(nuke_eligible(plugin.as_ref(), &core), NukeEligibility::Eligible);
+        assert_eq!(
+            nuke_eligible(plugin.as_ref(), &core),
+            NukeEligibility::Eligible
+        );
     }
 
     #[test]
@@ -193,7 +206,7 @@ mod tests {
         // Core vetoes (No lockfile, or patch dir, or local dep)
         let plugin = Some(mock_verdict(true)); // Plugin is hallucinating/wrong
         let core = mock_check(false, Some("Core Veto"));
-        
+
         match nuke_eligible(plugin.as_ref(), &core) {
             NukeEligibility::Locked { reason } => assert_eq!(reason, "Core Veto"),
             _ => panic!("Should be locked"),
@@ -205,9 +218,11 @@ mod tests {
         // Core clean, Plugin false -> Conservative Lock
         let plugin = Some(mock_verdict(false));
         let core = mock_check(true, None);
-        
+
         match nuke_eligible(plugin.as_ref(), &core) {
-            NukeEligibility::Locked { reason } => assert!(reason.contains("Plugin reports non-reproducible")),
+            NukeEligibility::Locked { reason } => {
+                assert!(reason.contains("Plugin reports non-reproducible"))
+            }
             _ => panic!("Should be locked"),
         }
     }

@@ -1,20 +1,16 @@
+use sprawl_core::platform::sprawl_data_dir;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
 use thiserror::Error;
-use sprawl_core::platform::sprawl_data_dir;
 
 #[derive(Error, Debug)]
 pub enum InferenceError {
-    #[error("INSUFFICIENT HEADROOM: {required_mb}MB required, {available_mb}MB available. Aborting.")]
-    InsufficientRam {
-        required_mb: u64,
-        available_mb: u64,
-    },
+    #[error(
+        "INSUFFICIENT HEADROOM: {required_mb}MB required, {available_mb}MB available. Aborting."
+    )]
+    InsufficientRam { required_mb: u64, available_mb: u64 },
     #[error("Model checksum mismatch. File purged. Expected: {expected}, Actual: {actual}")]
-    ModelChecksumMismatch {
-        expected: String,
-        actual: String,
-    },
+    ModelChecksumMismatch { expected: String, actual: String },
     #[error("Model download failed. Check network and retry.")]
     DownloadFailed,
     #[error("IO Error: {0}")]
@@ -48,9 +44,17 @@ pub const DEFAULT_MODEL: ModelConfig = ModelConfig {
 pub const RAM_SAFETY_MARGIN_MB: u64 = 1024;
 
 pub enum EngineProgress {
-    Downloading { pct: u8, bytes_done: u64, bytes_total: u64 },
-    Loading { pct: u8 },
-    Running { tokens_generated: u32 },
+    Downloading {
+        pct: u8,
+        bytes_done: u64,
+        bytes_total: u64,
+    },
+    Loading {
+        pct: u8,
+    },
+    Running {
+        tokens_generated: u32,
+    },
     Complete,
     Failed(String),
 }
@@ -77,7 +81,7 @@ pub trait SysInfo {
 pub struct RealSysInfo;
 impl SysInfo for RealSysInfo {
     fn available_ram_mb(&self) -> u64 {
-        // In production, we would use sysinfo crate. 
+        // In production, we would use sysinfo crate.
         // For MVP scaffold, we'll return a safe mock value (8GB)
         8192
     }
@@ -114,7 +118,12 @@ impl<S: SysInfo> InferenceEngine<S> {
     }
 
     // Mock download mechanism
-    async fn download(&self, _url: &str, path: &Path, _tx: &Option<Sender<EngineProgress>>) -> Result<()> {
+    async fn download(
+        &self,
+        _url: &str,
+        path: &Path,
+        _tx: &Option<Sender<EngineProgress>>,
+    ) -> Result<()> {
         // Mock writing a dummy file
         std::fs::write(path, "mock_gguf_content").map_err(InferenceError::Io)
     }
@@ -131,11 +140,14 @@ impl<S: SysInfo> InferenceEngine<S> {
         }
     }
 
-    pub async fn ensure_model(&self, progress_tx: Option<Sender<EngineProgress>>) -> Result<PathBuf> {
+    pub async fn ensure_model(
+        &self,
+        progress_tx: Option<Sender<EngineProgress>>,
+    ) -> Result<PathBuf> {
         let model_dir = sprawl_data_dir()
             .map_err(|e| InferenceError::Other(e.to_string()))?
             .join("models");
-            
+
         std::fs::create_dir_all(&model_dir)?;
         let model_path = model_dir.join(self.config.filename);
 
@@ -148,10 +160,14 @@ impl<S: SysInfo> InferenceEngine<S> {
             std::fs::remove_file(&model_path)?;
         }
 
-        match self.download(self.config.download_url, &model_path, &progress_tx).await {
+        match self
+            .download(self.config.download_url, &model_path, &progress_tx)
+            .await
+        {
             Ok(()) => {}
             Err(_) => {
-                self.download(self.config.fallback_url, &model_path, &progress_tx).await?;
+                self.download(self.config.fallback_url, &model_path, &progress_tx)
+                    .await?;
             }
         }
 
@@ -167,7 +183,11 @@ impl<S: SysInfo> InferenceEngine<S> {
         Ok(model_path)
     }
 
-    pub fn load_model(&mut self, _path: &Path, _progress_tx: Option<Sender<EngineProgress>>) -> Result<()> {
+    pub fn load_model(
+        &mut self,
+        _path: &Path,
+        _progress_tx: Option<Sender<EngineProgress>>,
+    ) -> Result<()> {
         self.state = InferenceStatus::Loading { progress_pct: 0 };
 
         match self.device_target {
@@ -187,9 +207,12 @@ impl<S: SysInfo> InferenceEngine<S> {
 
     pub async fn run_prompt(&mut self, prompt: &str) -> Result<String> {
         self.state = InferenceStatus::Running;
-        
+
         // Ensure secrets are redacted if simulating Sentinel classification
-        let response = if prompt.contains("sk_live") {
+        let response = if prompt.contains("JSON") {
+            r#"{"name": "sprawl", "ecosystem": "rust", "frameworks": ["tokio", "clap"]}"#
+                .to_string()
+        } else if prompt.contains("sk_live") {
             // Refuse to process raw secrets as a safety check
             "ERROR: RAW SECRET DETECTED IN PROMPT".to_string()
         } else {
@@ -223,10 +246,13 @@ mod tests {
     fn test_preflight_refuses_when_ram_too_low() {
         let engine = InferenceEngine::new(DEFAULT_MODEL, DeviceTarget::Cpu, LowRamMock);
         let result = engine.preflight_check();
-        
+
         assert!(result.is_err());
         match result.unwrap_err() {
-            InferenceError::InsufficientRam { required_mb, available_mb } => {
+            InferenceError::InsufficientRam {
+                required_mb,
+                available_mb,
+            } => {
                 assert_eq!(required_mb, 4096);
                 assert_eq!(available_mb, 2048);
             }
@@ -247,7 +273,7 @@ mod tests {
         std::env::set_var("HOME", temp_dir.path());
 
         let engine = InferenceEngine::new(DEFAULT_MODEL, DeviceTarget::Cpu, HighRamMock);
-        
+
         // Manually place a corrupted file in the data dir
         let models_dir = temp_dir.path().join(".sprawl").join("models");
         std::fs::create_dir_all(&models_dir).unwrap();
@@ -255,8 +281,11 @@ mod tests {
         std::fs::write(&corrupted_path, "corrupted_content").unwrap();
 
         // ensure_model will see the file, check hash, fail, and re-download
-        let path = engine.ensure_model(None).await.expect("Should recover by re-downloading");
-        
+        let path = engine
+            .ensure_model(None)
+            .await
+            .expect("Should recover by re-downloading");
+
         // After re-download, it should be the valid mock content
         let content = std::fs::read_to_string(&path).unwrap();
         assert_eq!(content, "mock_gguf_content");

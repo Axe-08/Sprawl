@@ -1,7 +1,7 @@
+use fixtures::create_node_with_lockfile;
+use sprawl_sweeper::engine::{ProjectId, SweeperEngine, TriageItem};
 use std::fs;
 use tempfile::tempdir;
-use sprawl_sweeper::engine::{SweeperEngine, TriageItem, ProjectId};
-use fixtures::create_node_with_lockfile;
 
 #[test]
 fn test_archive_and_restore_identity() {
@@ -10,10 +10,10 @@ fn test_archive_and_restore_identity() {
     let archive_path = dir.path().join("archive");
     fs::create_dir_all(&project_path).unwrap();
     fs::create_dir_all(&archive_path).unwrap();
-    
+
     // 1. Create a synthetic project
     create_node_with_lockfile(&project_path);
-    
+
     // Capture state before archival
     let mut before_files: Vec<String> = WalkDir::new(&project_path)
         .into_iter()
@@ -23,7 +23,7 @@ fn test_archive_and_restore_identity() {
     before_files.sort();
 
     let engine = SweeperEngine::new();
-    
+
     // 2. Archive it
     let item = TriageItem {
         project_id: ProjectId("my-project".to_string()),
@@ -36,14 +36,16 @@ fn test_archive_and_restore_identity() {
         recommended_action: sprawl_sweeper::engine::TriageAction::Archive,
     };
     engine.archive(&item, &archive_path).unwrap();
-    
+
     // Verify it was replaced by a symlink
     let metadata = fs::symlink_metadata(&project_path).unwrap();
     assert!(metadata.file_type().is_symlink());
 
     // 3. Restore it
-    engine.restore(&project_path, &archive_path.join("my-project")).unwrap();
-    
+    engine
+        .restore(&project_path, &archive_path.join("my-project"))
+        .unwrap();
+
     // Verify it is a real directory again
     let metadata_after = fs::symlink_metadata(&project_path).unwrap();
     assert!(metadata_after.file_type().is_dir());
@@ -56,7 +58,10 @@ fn test_archive_and_restore_identity() {
         .collect();
     after_files.sort();
 
-    assert_eq!(before_files, after_files, "Restored project tree differs from original");
+    assert_eq!(
+        before_files, after_files,
+        "Restored project tree differs from original"
+    );
 }
 
 // Simple walkdir implementation since we don't have walkdir crate configured
@@ -65,7 +70,9 @@ struct WalkDir {
 }
 impl WalkDir {
     fn new(path: &std::path::Path) -> Self {
-        Self { stack: vec![path.to_path_buf()] }
+        Self {
+            stack: vec![path.to_path_buf()],
+        }
     }
 }
 impl Iterator for WalkDir {

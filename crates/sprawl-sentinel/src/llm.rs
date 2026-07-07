@@ -1,6 +1,6 @@
-use uuid::Uuid;
-use sprawl_inference::{InferenceEngine, Result as InferenceResult};
 use crate::classify::SecretClassification;
+use sprawl_inference::{InferenceEngine, Result as InferenceResult};
+use uuid::Uuid;
 
 #[derive(Debug, Clone)]
 pub struct DiscoveredSecret {
@@ -35,7 +35,7 @@ pub async fn batch_classify<S: sprawl_inference::SysInfo>(
         );
 
         let response = inference.run_prompt(&prompt).await?;
-        
+
         let classification = if response.contains("likely_noise") {
             SecretClassification::FilteredNoise("LLM classified as noise".to_string())
         } else {
@@ -53,7 +53,7 @@ pub async fn batch_classify<S: sprawl_inference::SysInfo>(
 mod tests {
     use super::*;
     use sprawl_inference::{DeviceTarget, SysInfo};
-    
+
     struct HighRamMock;
     impl SysInfo for HighRamMock {
         fn available_ram_mb(&self) -> u64 {
@@ -69,20 +69,21 @@ mod tests {
             HighRamMock,
         );
 
-        let secrets = vec![
-            DiscoveredSecret {
-                id: Uuid::new_v4(),
-                raw_value: format!("sk_live_{}", "1234567890abcdefghijklmnopqrstuv").to_string(),
-                filepath: ".env".to_string(),
-            },
-        ];
+        let secrets = vec![DiscoveredSecret {
+            id: Uuid::new_v4(),
+            raw_value: format!("sk_live_{}", "1234567890abcdefghijklmnopqrstuv").to_string(),
+            filepath: ".env".to_string(),
+        }];
 
         let results = batch_classify(&secrets, &mut engine).await.unwrap();
-        
+
         assert_eq!(results.len(), 1);
         // The mock engine returns likely_noise unless the exact string 'sk_live' is in the prompt.
         // Because we redacted it to 'sk_l...stuv', 'sk_live' won't be in the prompt.
         // Therefore, it will return likely_noise, proving redaction worked!
-        assert!(matches!(results[0].1, SecretClassification::FilteredNoise(_)));
+        assert!(matches!(
+            results[0].1,
+            SecretClassification::FilteredNoise(_)
+        ));
     }
 }

@@ -146,36 +146,30 @@ pub struct PresetData {
 
 pub fn get_global_preset() -> PresetData {
     PresetData {
-        rules: vec![
-            SweepRule {
-                name: "Global Snooze Baseline".to_string(),
-                description: "Mock".to_string(),
-                condition: TriageCondition { predicates: vec![] },
-                action: "snooze_default".to_string(),
-                source: "Global Defaults".to_string(),
-            }
-        ],
-        noise_patterns: vec![
-            NoisePattern {
-                name: "Mock Noise".to_string(),
-                pattern: "mock".to_string(),
-                source: "Global Defaults".to_string(),
-            }
-        ],
+        rules: vec![SweepRule {
+            name: "Global Snooze Baseline".to_string(),
+            description: "Mock".to_string(),
+            condition: TriageCondition { predicates: vec![] },
+            action: "snooze_default".to_string(),
+            source: "Global Defaults".to_string(),
+        }],
+        noise_patterns: vec![NoisePattern {
+            name: "Mock Noise".to_string(),
+            pattern: "mock".to_string(),
+            source: "Global Defaults".to_string(),
+        }],
     }
 }
 
 pub fn get_web_dev_preset() -> PresetData {
     PresetData {
-        rules: vec![
-            SweepRule {
-                name: "Nuke node_modules".to_string(),
-                description: "Mock".to_string(),
-                condition: TriageCondition { predicates: vec![] },
-                action: "nuke_safe".to_string(),
-                source: "web-dev".to_string(),
-            }
-        ],
+        rules: vec![SweepRule {
+            name: "Nuke node_modules".to_string(),
+            description: "Mock".to_string(),
+            condition: TriageCondition { predicates: vec![] },
+            action: "nuke_safe".to_string(),
+            source: "web-dev".to_string(),
+        }],
         noise_patterns: vec![],
     }
 }

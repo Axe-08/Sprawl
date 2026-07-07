@@ -28,19 +28,29 @@ impl std::str::FromStr for Predicate {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let parts: Vec<&str> = s.split_whitespace().collect();
         if parts.len() != 3 {
-            return Err(crate::SprawlError::Other(format!("Invalid predicate syntax: {}", s)));
+            return Err(crate::SprawlError::Other(format!(
+                "Invalid predicate syntax: {}",
+                s
+            )));
         }
 
         let operand = parts[0].to_string();
         let operator = parts[1].to_string();
-        
+
         let value = parts[2].parse::<u64>().map_err(|_| {
             crate::SprawlError::Other(format!("Invalid predicate value: {}", parts[2]))
         })?;
 
         match operator.as_str() {
-            ">" | "<" | ">=" | "<=" | "==" | "!=" => Ok(Predicate { operand, operator, value }),
-            _ => Err(crate::SprawlError::Other(format!("Invalid predicate operator: {}", operator))),
+            ">" | "<" | ">=" | "<=" | "==" | "!=" => Ok(Predicate {
+                operand,
+                operator,
+                value,
+            }),
+            _ => Err(crate::SprawlError::Other(format!(
+                "Invalid predicate operator: {}",
+                operator
+            ))),
         }
     }
 }
@@ -86,7 +96,11 @@ mod tests {
         ];
 
         for expr in invalid {
-            assert!(Predicate::from_str(expr).is_err(), "Expected failure for complex expressions: {}", expr);
+            assert!(
+                Predicate::from_str(expr).is_err(),
+                "Expected failure for complex expressions: {}",
+                expr
+            );
         }
     }
 }

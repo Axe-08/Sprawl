@@ -7,7 +7,9 @@ pub fn set_low_priority() -> Result<()> {
     #[cfg(unix)]
     {
         // nice(19) — lowest priority on Linux/macOS
-        unsafe { libc::nice(19); }
+        unsafe {
+            libc::nice(19);
+        }
         Ok(())
     }
     #[cfg(windows)]
@@ -26,7 +28,8 @@ pub fn set_low_priority() -> Result<()> {
 pub fn sprawl_data_dir() -> Result<PathBuf> {
     // In a real app we'd use the `dirs` crate
     // For this scaffold we'll use a temp/dummy or standard rust std::env::var
-    let home = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE"))
+    let home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
         .map_err(|_| crate::SprawlError::Other("Cannot determine home directory".into()))?;
     Ok(PathBuf::from(home).join(".sprawl"))
 }

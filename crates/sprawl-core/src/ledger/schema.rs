@@ -6,12 +6,13 @@ pub const CURRENT_SCHEMA_VERSION: i32 = 1;
 pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
     let conn = Connection::open(db_path)
         .map_err(|e| crate::SprawlError::Other(format!("Failed to open DB: {}", e)))?;
-        
+
     // Enable WAL mode
     conn.execute_batch("PRAGMA journal_mode = WAL;")
         .map_err(|e| crate::SprawlError::Other(format!("Failed to enable WAL: {}", e)))?;
-        
-    let user_version: i32 = conn.pragma_query_value(None, "user_version", |row| row.get(0))
+
+    let user_version: i32 = conn
+        .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|e| crate::SprawlError::Other(format!("Failed to read user_version: {}", e)))?;
 
     if user_version == 0 {
@@ -57,15 +58,18 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 value TEXT NOT NULL
             );
             INSERT INTO schema_meta VALUES ('schema_version', '1');
-            "
-        ).map_err(|e| crate::SprawlError::Other(format!("Failed to initialize schema: {}", e)))?;
-        
+            ",
+        )
+        .map_err(|e| crate::SprawlError::Other(format!("Failed to initialize schema: {}", e)))?;
+
         conn.pragma_update(None, "user_version", CURRENT_SCHEMA_VERSION)
-            .map_err(|e| crate::SprawlError::Other(format!("Failed to update user_version: {}", e)))?;
+            .map_err(|e| {
+                crate::SprawlError::Other(format!("Failed to update user_version: {}", e))
+            })?;
     } else if user_version < CURRENT_SCHEMA_VERSION {
-        // Here we would perform schema migration. 
+        // Here we would perform schema migration.
         // As per Step 3.6: Always backup before migrate.
     }
-    
+
     Ok(conn)
 }

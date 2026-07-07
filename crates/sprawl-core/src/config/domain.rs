@@ -23,8 +23,12 @@ pub struct NoisePattern {
 
 impl NoisePattern {
     pub fn compile_regex(&self) -> Result<regex::Regex, crate::SprawlError> {
-        regex::Regex::new(&self.pattern)
-            .map_err(|e| crate::SprawlError::Other(format!("Invalid regex in noise pattern '{}': {}", self.name, e)))
+        regex::Regex::new(&self.pattern).map_err(|e| {
+            crate::SprawlError::Other(format!(
+                "Invalid regex in noise pattern '{}': {}",
+                self.name, e
+            ))
+        })
     }
 }
 
@@ -41,10 +45,16 @@ mod tests {
         };
 
         let err = pattern.compile_regex();
-        assert!(err.is_err(), "Expected regex compilation to fail for invalid pattern");
-        
+        assert!(
+            err.is_err(),
+            "Expected regex compilation to fail for invalid pattern"
+        );
+
         let err_msg = err.unwrap_err().to_string();
-        assert!(err_msg.contains("Invalid regex in noise pattern"), "Error message should clearly indicate regex failure");
+        assert!(
+            err_msg.contains("Invalid regex in noise pattern"),
+            "Error message should clearly indicate regex failure"
+        );
     }
 
     #[test]
@@ -55,6 +65,9 @@ mod tests {
             source: "Test".to_string(),
         };
 
-        assert!(pattern.compile_regex().is_ok(), "Valid regex should compile successfully");
+        assert!(
+            pattern.compile_regex().is_ok(),
+            "Valid regex should compile successfully"
+        );
     }
 }

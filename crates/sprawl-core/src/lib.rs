@@ -2,9 +2,9 @@ pub mod config;
 pub mod error;
 pub mod ledger;
 pub mod manifest;
+pub mod migrations;
 pub mod platform;
 pub mod types;
-pub mod migrations;
 
 // Re-export common types
-pub use error::{SprawlError, Result};
+pub use error::{Result, SprawlError};
