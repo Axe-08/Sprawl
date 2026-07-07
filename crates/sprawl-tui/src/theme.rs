@@ -1,11 +1,11 @@
 use ratatui::style::Color;
 
 pub struct ThemeColors {
-    pub destructive: Color,     // Red — irreversible/blocked
-    pub needs_review: Color,    // Yellow/Amber — ambiguous
-    pub safe: Color,            // Green — verified/complete
-    pub info: Color,            // Cyan — informational
-    pub dormant: Color,         // Gray — snoozed/disabled
+    pub destructive: Color,  // Red — irreversible/blocked
+    pub needs_review: Color, // Yellow/Amber — ambiguous
+    pub safe: Color,         // Green — verified/complete
+    pub info: Color,         // Cyan — informational
+    pub dormant: Color,      // Gray — snoozed/disabled
 }
 
 impl ThemeColors {

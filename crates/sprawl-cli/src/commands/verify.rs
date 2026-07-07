@@ -1,6 +1,6 @@
 use clap::Args;
-use uuid::Uuid;
 use sprawl_core::Result;
+use uuid::Uuid;
 
 #[derive(Args)]
 pub struct VerifyArgs {
@@ -14,14 +14,18 @@ pub fn handle(args: &VerifyArgs, is_json: bool) -> Result<()> {
     match sprawl_sentinel::verify::verify_mcp(secret_id) {
         Ok(status) => {
             if is_json {
-                println!("{}", serde_json::json!({"status": "ok", "result": format!("{:?}", status)}));
+                println!(
+                    "{}",
+                    serde_json::json!({"status": "ok", "result": format!("{:?}", status)})
+                );
             } else {
                 println!("Verification result: {:?}", status);
             }
             Ok(())
-        },
-        Err(e) => {
-            Err(sprawl_core::SprawlError::Other(format!("Verification failed: {}", e)))
         }
+        Err(e) => Err(sprawl_core::SprawlError::Other(format!(
+            "Verification failed: {}",
+            e
+        ))),
     }
 }

@@ -24,25 +24,32 @@ pub enum PluginAction {
 pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
     let plugin_dir = PathBuf::from(home).join(".sprawl").join("plugins");
-    
+
     if !plugin_dir.exists() {
-        std::fs::create_dir_all(&plugin_dir).map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to create plugins dir: {}", e)))?;
+        std::fs::create_dir_all(&plugin_dir).map_err(|e| {
+            sprawl_core::SprawlError::Other(format!("Failed to create plugins dir: {}", e))
+        })?;
     }
 
     match &args.action {
         PluginAction::Install { source } => {
             if !source.exists() {
-                return Err(sprawl_core::SprawlError::Other("Source file does not exist".into()));
+                return Err(sprawl_core::SprawlError::Other(
+                    "Source file does not exist".into(),
+                ));
             }
             if source.extension().and_then(|s| s.to_str()) != Some("wasm") {
-                return Err(sprawl_core::SprawlError::Other("Only .wasm files are supported".into()));
+                return Err(sprawl_core::SprawlError::Other(
+                    "Only .wasm files are supported".into(),
+                ));
             }
-            
+
             let name = source.file_stem().unwrap().to_string_lossy().to_string();
             let dest = plugin_dir.join(format!("{}.wasm", name));
-            
-            std::fs::copy(source, &dest).map_err(|e| sprawl_core::SprawlError::Other(format!("Install failed: {}", e)))?;
-            
+
+            std::fs::copy(source, &dest)
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Install failed: {}", e)))?;
+
             if !is_json {
                 println!("Successfully installed plugin '{}'", name);
             }
@@ -58,11 +65,14 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
                     }
                 }
             }
-            
+
             if is_json {
-                println!("{}", serde_json::json!({
-                    "plugins": plugins
-                }));
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "plugins": plugins
+                    })
+                );
             } else {
                 if plugins.is_empty() {
                     println!("No plugins installed.");
@@ -77,21 +87,29 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
         PluginAction::Remove { name } => {
             let dest = plugin_dir.join(format!("{}.wasm", name));
             if dest.exists() {
-                std::fs::remove_file(&dest).map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to remove: {}", e)))?;
+                std::fs::remove_file(&dest).map_err(|e| {
+                    sprawl_core::SprawlError::Other(format!("Failed to remove: {}", e))
+                })?;
                 if !is_json {
                     println!("Removed plugin '{}'", name);
                 }
             } else {
-                return Err(sprawl_core::SprawlError::Other(format!("Plugin '{}' not found", name)));
+                return Err(sprawl_core::SprawlError::Other(format!(
+                    "Plugin '{}' not found",
+                    name
+                )));
             }
         }
         PluginAction::Update { name, source } => {
             if !source.exists() {
-                return Err(sprawl_core::SprawlError::Other("Source file does not exist".into()));
+                return Err(sprawl_core::SprawlError::Other(
+                    "Source file does not exist".into(),
+                ));
             }
             let dest = plugin_dir.join(format!("{}.wasm", name));
-            std::fs::copy(source, &dest).map_err(|e| sprawl_core::SprawlError::Other(format!("Update failed: {}", e)))?;
-            
+            std::fs::copy(source, &dest)
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Update failed: {}", e)))?;
+
             if !is_json {
                 println!("Successfully updated plugin '{}'", name);
             }

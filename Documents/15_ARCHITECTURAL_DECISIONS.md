@@ -186,3 +186,23 @@ The `sprawl-dev` crate activates `mock-backend` on all relevant crates as its de
 **Rationale**: Forcing `--json` on commands like `bundle` (which outputs a 10,000-line markdown file) creates bloated, hard-to-parse responses wrapped in JSON envelopes. 
 
 **Future Work**: Post-MVP, this may be expanded to provide custom metadata structures (e.g., `bundle --json` returning the local path to the generated markdown file rather than the contents).
+
+---
+
+## ADR-015 — Candle Inference Feature Gate (Compile Times)
+
+**Decision**: The `candle` ecosystem (core, nn, transformers) and `tokenizers` dependencies are gated behind an optional `inference` feature flag in `sprawl-inference`.
+
+**Rationale**: `candle` is a massive dependency tree that significantly impacts compile times. For routine development of the TUI, sweeping logic, or plugins, forcing developers to compile the inference engine creates friction.
+
+**Tradeoff accepted**: The default `cargo build` produces a binary that cannot run actual LLM inference (falling back to mock responses or failing gracefully). True inference requires `cargo build --features inference`.
+
+---
+
+## ADR-016 — Windows MCP Verify Fallback (Unknown)
+
+**Decision**: The `sprawl verify` command uses `std::os::unix::net::UnixStream` on Unix-like systems to communicate with the MCP server. On Windows, it explicitly stubs out to `VerificationStatus::Unknown`.
+
+**Rationale**: Windows does not support `UnixStream`. While named pipes (`\\.\pipe\...`) could be used, there is currently no established standard for MCP servers on Windows that we can reliably delegate to for MVP.
+
+**Future Work**: Post-MVP, implement named pipe IPC for Windows once the MCP ecosystem matures on that platform.

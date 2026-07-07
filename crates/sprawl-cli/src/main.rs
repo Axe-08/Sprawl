@@ -45,7 +45,11 @@ async fn main() {
     let cli = Cli::parse();
 
     // Initialize tracing based on verbose flag
-    let level = if cli.verbose { Level::DEBUG } else { Level::WARN };
+    let level = if cli.verbose {
+        Level::DEBUG
+    } else {
+        Level::WARN
+    };
     tracing_subscriber::fmt()
         .with_max_level(level)
         .with_writer(std::io::stderr)
@@ -70,14 +74,17 @@ async fn main() {
 
     if let Err(e) = result {
         if cli.json {
-            eprintln!("{}", serde_json::json!({
-                "status": "error",
-                "error": e.to_string()
-            }));
+            eprintln!(
+                "{}",
+                serde_json::json!({
+                    "status": "error",
+                    "error": e.to_string()
+                })
+            );
         } else {
             eprintln!("Error: {}", e);
         }
-        
+
         let msg = e.to_string();
         if msg.contains("INSUFFICIENT HEADROOM") {
             process::exit(3);
@@ -87,6 +94,6 @@ async fn main() {
             process::exit(1);
         }
     }
-    
+
     process::exit(0);
 }

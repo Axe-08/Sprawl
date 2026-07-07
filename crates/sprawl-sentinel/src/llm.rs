@@ -30,17 +30,26 @@ pub async fn batch_classify<S: sprawl_inference::SysInfo>(
         };
 
         let prompt = format!(
-            "Classify the following string found in {}:\n{}\nIs it likely_secret or likely_noise?",
+            "Classify the string found in {}: {}\nRespond with JSON: {{\"classification\": \"likely_secret\" | \"likely_noise\" | \"ambiguous\", \"reason\": \"<short reason>\"}}",
             secret.filepath, redacted
         );
 
         let response = inference.run_prompt(&prompt).await?;
 
-        let classification = if response.contains("likely_noise") {
-            SecretClassification::FilteredNoise("LLM classified as noise".to_string())
-        } else {
-            // Defaulting to KnownProvider for now since our system expects it to vault
-            SecretClassification::KnownProvider("LLM batch classified".to_string())
+        #[derive(serde::Deserialize)]
+        struct LlmClassification {
+            classification: String,
+            reason: String,
+        }
+
+        let parsed: std::result::Result<LlmClassification, _> = serde_json::from_str(&response);
+        let classification = match parsed {
+            Ok(c) if c.classification == "likely_noise" => {
+                SecretClassification::FilteredNoise(c.reason)
+            }
+            Ok(c) if c.classification == "ambiguous" => SecretClassification::Ambiguous,
+            Ok(c) => SecretClassification::KnownProvider(c.reason),
+            Err(_) => SecretClassification::Ambiguous, // Malformed response -> conservative default
         };
 
         results.push((secret.id, classification));

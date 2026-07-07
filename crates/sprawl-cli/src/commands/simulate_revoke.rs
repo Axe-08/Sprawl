@@ -10,16 +10,17 @@ pub struct SimulateRevokeArgs {
 
 pub fn handle(args: &SimulateRevokeArgs, is_json: bool) -> Result<()> {
     if is_json {
-        println!("{}", serde_json::json!({
-            "status": "ok",
-            "message": format!("Simulating revocation for key {}...", args.key),
-            "detail": "No immediate blast radius detected (Archivist graph indexing not yet active)."
-        }));
+        println!(
+            "{}",
+            serde_json::json!({
+                "status": "ok",
+                "message": format!("Simulating revocation for key {}...", args.key),
+                "detail": "No immediate blast radius detected (Archivist graph indexing not yet active)."
+            })
+        );
     } else {
         println!("Simulating revocation for key {}...", args.key);
-        println!(
-            "No immediate blast radius detected (Archivist graph indexing not yet active)."
-        );
+        println!("No immediate blast radius detected (Archivist graph indexing not yet active).");
     }
     Ok(())
 }

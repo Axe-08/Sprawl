@@ -47,7 +47,11 @@ impl SentinelScanner {
         }
     }
 
-    pub fn new(noise_patterns: Vec<NoisePattern>, keyring: Box<dyn KeyringBackend>, ledger: Box<dyn LedgerBackend>) -> Self {
+    pub fn new(
+        noise_patterns: Vec<NoisePattern>,
+        keyring: Box<dyn KeyringBackend>,
+        ledger: Box<dyn LedgerBackend>,
+    ) -> Self {
         Self {
             _noise_patterns: noise_patterns,
             keyring,
@@ -72,13 +76,16 @@ impl SentinelScanner {
             SecretClassification::KnownProvider(_provider_name) => {
                 // M10 Flow: Vault immediately
                 #[cfg(any(test, feature = "mock-backend"))]
-                let _hash = "mock_sha256_hash"; // Implementation detail
-                
+                let _hash = "mock_sha256_hash".to_string(); // Implementation detail
+
                 #[cfg(not(any(test, feature = "mock-backend")))]
-                let _hash = "TODO:real_sha256_hash"; // Implementation detail
-                
+                let _hash = {
+                    use sha2::{Digest, Sha256};
+                    hex::encode(Sha256::digest(raw_value.as_bytes()))
+                };
+
                 let keyring_ref = self.keyring.vault_secret(&raw_value);
-                self.ledger.save_secret(_hash, &keyring_ref);
+                self.ledger.save_secret(&_hash, &keyring_ref);
 
                 // Zeroize raw string securely
                 raw_value.zeroize();

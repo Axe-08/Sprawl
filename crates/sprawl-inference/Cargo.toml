@@ -12,6 +12,15 @@ thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
 serde.workspace = true
+sysinfo = "0.39.5"
+sha2 = "0.10"
+hex = "0.4"
+reqwest = { version = "0.12", features = ["stream", "rustls-tls"], default-features = false }
+futures-util = "0.3"
+candle-core = { version = "0.8.2", features = ["metal"], optional = true }
+candle-nn = { version = "0.8.2", optional = true }
+candle-transformers = { version = "0.8.2", optional = true }
+tokenizers = { version = "0.20", optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"
@@ -19,3 +28,4 @@ tempfile = "3.10"
 [features]
 default = []
 mock-backend = []
+inference = ["dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers"]

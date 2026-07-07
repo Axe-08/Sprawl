@@ -16,7 +16,7 @@ pub fn handle_events(app: &mut App) -> std::io::Result<()> {
                     KeyCode::Char('2') => app.current_tab = Tab::SweeperInbox,
                     KeyCode::Char('3') => app.current_tab = Tab::SentinelInbox,
                     KeyCode::Char('4') => app.current_tab = Tab::SemanticSearch,
-                    
+
                     // Basic navigation
                     KeyCode::Down if app.current_tab == Tab::SweeperInbox => {
                         if app.sweeper.selected_index + 1 < app.sweeper.items.len() {

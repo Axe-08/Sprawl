@@ -50,11 +50,11 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             // we will need to read pid file and maybe check process
             let data_dir = sprawl_core::platform::sprawl_data_dir()?;
             let pid_file = data_dir.join("sprawl.pid");
-            
+
             let is_running = if pid_file.exists() {
                 let pid_str = std::fs::read_to_string(&pid_file).unwrap_or_default();
                 let pid = pid_str.trim().parse::<u32>().unwrap_or(0);
-                
+
                 #[cfg(unix)]
                 {
                     unsafe { libc::kill(pid as i32, 0) == 0 }
@@ -66,11 +66,14 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             } else {
                 false
             };
-            
+
             if is_json {
-                println!("{}", serde_json::json!({
-                    "status": if is_running { "running" } else { "stopped" }
-                }));
+                println!(
+                    "{}",
+                    serde_json::json!({
+                        "status": if is_running { "running" } else { "stopped" }
+                    })
+                );
             } else {
                 if is_running {
                     println!("Daemon is running.");

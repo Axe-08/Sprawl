@@ -1,9 +1,9 @@
 use clap::Args;
-use std::path::PathBuf;
 use sprawl_archaeologist::analyze::analyze_deep;
+use sprawl_core::Result;
 use sprawl_inference::{DeviceTarget, InferenceEngine, RealSysInfo, DEFAULT_MODEL};
 use std::io::{self, Write};
-use sprawl_core::Result;
+use std::path::PathBuf;
 
 #[derive(Args)]
 pub struct AnalyzeArgs {
@@ -19,17 +19,19 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
         if !is_json {
             println!("Initializing Inference Engine...");
         }
-        let mut engine =
-            InferenceEngine::new(DEFAULT_MODEL, DeviceTarget::Cpu, RealSysInfo);
+        let mut engine = InferenceEngine::new(DEFAULT_MODEL, DeviceTarget::Cpu, RealSysInfo);
 
         match analyze_deep(&args.dir, &mut engine).await {
             Ok(derived) => {
                 if is_json {
-                    println!("{}", serde_json::json!({
-                        "name": derived.name,
-                        "ecosystem": derived.ecosystem,
-                        "frameworks": derived.frameworks
-                    }));
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "name": derived.name,
+                            "ecosystem": derived.ecosystem,
+                            "frameworks": derived.frameworks
+                        })
+                    );
                 } else {
                     println!("Analysis Complete:");
                     println!("Name: {}", derived.name);
@@ -59,7 +61,8 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
                             .join("cache")
                             .join(format!("{}.toml", derived.name));
                         if let Some(parent) = path.parent() {
-                            std::fs::create_dir_all(parent).map_err(sprawl_core::SprawlError::Io)?;
+                            std::fs::create_dir_all(parent)
+                                .map_err(sprawl_core::SprawlError::Io)?;
                         }
                         std::fs::write(&path, config_toml).map_err(sprawl_core::SprawlError::Io)?;
                         println!("Saved to global cache: {}", path.display());
@@ -76,10 +79,10 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
         }
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let plugin_dir = PathBuf::from(home).join(".sprawl").join("plugins");
-        
+
         let host = sprawl_plugin_host::PluginHost::new().expect("Failed to init PluginHost");
         let mut registry = sprawl_plugin_host::PluginRegistry::new();
-        
+
         if let Ok(entries) = std::fs::read_dir(&plugin_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
@@ -91,19 +94,22 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
                 }
             }
         }
-        
+
         let arch = sprawl_archaeologist::Archaeologist::new(host, registry);
-        
+
         match arch.detect_stack(&args.dir).await {
             Ok((Some(primary), _)) => {
                 if is_json {
-                    println!("{}", serde_json::json!({
-                        "ecosystem": primary.ecosystem,
-                        "reproducible": primary.reproducibility.is_reproducible,
-                        "evidence": primary.reproducibility.evidence,
-                        "entry_points": primary.entry_points,
-                        "dependencies_count": primary.dependencies.len()
-                    }));
+                    println!(
+                        "{}",
+                        serde_json::json!({
+                            "ecosystem": primary.ecosystem,
+                            "reproducible": primary.reproducibility.is_reproducible,
+                            "evidence": primary.reproducibility.evidence,
+                            "entry_points": primary.entry_points,
+                            "dependencies_count": primary.dependencies.len()
+                        })
+                    );
                 } else {
                     println!("Detection successful via fast-path!");
                     println!("Ecosystem: {}", primary.ecosystem);
@@ -120,14 +126,20 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
             }
             Ok((None, _)) => {
                 if is_json {
-                    println!("{}", serde_json::json!({"error": "No known stack detected"}));
+                    println!(
+                        "{}",
+                        serde_json::json!({"error": "No known stack detected"})
+                    );
                 } else {
                     println!("No known stack detected via fast-path.");
                     println!("Hint: Try using `sprawl analyze --deep` for L2 analysis.");
                 }
             }
             Err(e) => {
-                return Err(sprawl_core::SprawlError::Other(format!("Fast-path detection failed: {}", e)));
+                return Err(sprawl_core::SprawlError::Other(format!(
+                    "Fast-path detection failed: {}",
+                    e
+                )));
             }
         }
     }

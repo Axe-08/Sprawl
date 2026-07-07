@@ -29,12 +29,11 @@ impl DaemonContext {
         set_low_priority()?;
 
         let pid = std::process::id();
-        std::fs::write(&self.pid_file, pid.to_string())
-            .map_err(sprawl_core::SprawlError::Io)?;
+        std::fs::write(&self.pid_file, pid.to_string()).map_err(sprawl_core::SprawlError::Io)?;
         tracing::info!("Daemon started successfully (foreground blocking)");
-        
+
         let res = run_loop();
-        
+
         let _ = std::fs::remove_file(&self.pid_file);
         res
     }

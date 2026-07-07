@@ -54,7 +54,11 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
 
     let tabs = Tabs::new(titles)
         .block(Block::default().borders(Borders::ALL))
-        .highlight_style(Style::default().fg(app.theme.safe).add_modifier(Modifier::BOLD))
+        .highlight_style(
+            Style::default()
+                .fg(app.theme.safe)
+                .add_modifier(Modifier::BOLD),
+        )
         .select(active_index);
     f.render_widget(tabs, area);
 }
@@ -113,7 +117,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
         Tab::SentinelInbox => " [k] Known secret  [n] Noise  [W] Batch Classify ",
         Tab::SemanticSearch => " [Esc] Cancel search ",
     };
-    
+
     let p = Paragraph::new(footer_text)
         .block(Block::default().borders(Borders::ALL))
         .style(Style::default().fg(app.theme.info));

@@ -2,8 +2,8 @@ pub mod data;
 
 use sprawl_archivist::{SearchResult, VectorDatabase};
 use sprawl_core::Result;
-use sprawl_sentinel::scanner::{KeyringBackend, LedgerBackend};
 use sprawl_inference::SysInfo;
+use sprawl_sentinel::scanner::{KeyringBackend, LedgerBackend};
 
 pub struct MockDatabase;
 
@@ -14,7 +14,11 @@ impl MockDatabase {
 }
 
 impl VectorDatabase for MockDatabase {
-    fn search(&self, _query_embedding: &[f32], _top_k: usize) -> sprawl_archivist::Result<Vec<SearchResult>> {
+    fn search(
+        &self,
+        _query_embedding: &[f32],
+        _top_k: usize,
+    ) -> sprawl_archivist::Result<Vec<SearchResult>> {
         Ok(vec![SearchResult {
             project_id: "test_proj".into(),
             file_path: "src/main.rs".into(),
