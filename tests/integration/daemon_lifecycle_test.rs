@@ -12,12 +12,15 @@ async fn test_daemon_lifecycle() {
     // Bind the socket
     server.bind().await.unwrap();
 
-    // Verify socket exists
-    let socket_path = temp_dir.path().join(".sprawl/sprawl.sock");
-    assert!(
-        socket_path.exists(),
-        "IPC socket was not created at expected path"
-    );
+    // Verify socket exists (on Unix it creates a file; on Windows we use named pipes eventually, which don't exist as normal files)
+    #[cfg(unix)]
+    {
+        let socket_path = temp_dir.path().join(".sprawl/sprawl.sock");
+        assert!(
+            socket_path.exists(),
+            "IPC socket was not created at expected path"
+        );
+    }
 
     // Clean up
 }
