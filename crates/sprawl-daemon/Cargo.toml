@@ -16,7 +16,6 @@ anyhow.workspace = true
 serde_json.workspace = true
 
 [target.'cfg(unix)'.dependencies]
-daemonize = "0.5"
 libc.workspace = true
 
 [dev-dependencies]

@@ -156,3 +156,33 @@ The `sprawl-dev` crate activates `mock-backend` on all relevant crates as its de
 | `sprawl-sentinel/verify.rs` | MCP-routed verification is a simulated response | Phase 2 |
 | `sprawl-daemon/lib.rs` | Event dispatch to Archaeologist/Sweeper/Sentinel not wired | Phase 2 |
 | `sprawl-sweeper/engine.rs` | `restore` reads from manifest but manifest persistence is partial | M12 |
+
+---
+
+## ADR-012 — Daemon Start is Foreground Blocking (MVP)
+
+**Decision**: `sprawl daemon start` runs synchronously in the foreground, blocking the terminal. It does not `fork()` into the background.
+
+**Rationale**: Implementing a true daemonizing `fork()` that works consistently across Windows and Unix is complex and unnecessary for MVP. We rely on the user or an OS-level service manager (`systemd`, `launchd`) to background the process.
+
+**Future Work**: Post-MVP, a true cross-platform backgrounding mechanism will be added so users can spawn it and get their shell back immediately.
+
+---
+
+## ADR-013 — Plugin Installation is Local-Only (MVP)
+
+**Decision**: `sprawl plugin install <path>` only accepts local file paths to `.wasm` files. URLs are explicitly rejected.
+
+**Rationale**: Supporting URL downloads requires shipping HTTP clients, dealing with TLS, network errors, and crucially, enforcing cryptographic signature checks to prevent supply-chain attacks. Local-only ensures the user is deliberately installing a binary they fetched themselves.
+
+**Future Work**: Post-MVP, we will support URLs and potentially build a Sprawl Plugin Marketplace with integrated signing/verification.
+
+---
+
+## ADR-014 — `--json` Scope is Limited to Status/Info Commands
+
+**Decision**: The `--json` CLI flag is only respected by commands that output structured operational data (`daemon status`, `plugin list`, `verify`, `analyze`). 
+
+**Rationale**: Forcing `--json` on commands like `bundle` (which outputs a 10,000-line markdown file) creates bloated, hard-to-parse responses wrapped in JSON envelopes. 
+
+**Future Work**: Post-MVP, this may be expanded to provide custom metadata structures (e.g., `bundle --json` returning the local path to the generated markdown file rather than the contents).

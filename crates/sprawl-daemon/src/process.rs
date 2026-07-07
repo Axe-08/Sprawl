@@ -22,52 +22,21 @@ impl DaemonContext {
 
     pub fn start(&self, run_loop: impl FnOnce() -> Result<()>) -> Result<()> {
         if self.pid_file.exists() {
-            // Check if process is actually running (simplified)
             tracing::warn!("PID file exists, checking if daemon is stale...");
-            std::fs::remove_file(&self.pid_file).map_err(|e| {
-                sprawl_core::SprawlError::Other(format!("Failed to clean stale PID: {}", e))
-            })?;
+            let _ = std::fs::remove_file(&self.pid_file);
         }
 
-        // OS Priority Yielding
         set_low_priority()?;
 
-        #[cfg(unix)]
-        {
-            use daemonize::Daemonize;
-            let data_dir = sprawl_data_dir()?;
-
-            let daemonize = Daemonize::new()
-                .pid_file(&self.pid_file)
-                .chown_pid_file(true)
-                .working_directory(data_dir);
-
-            match daemonize.start() {
-                Ok(_) => {
-                    tracing::info!("Daemon started successfully");
-                    run_loop()
-                }
-                Err(e) => Err(sprawl_core::SprawlError::Other(format!(
-                    "Daemonize failed: {}",
-                    e
-                ))),
-            }
-        }
-
-        #[cfg(not(unix))]
-        {
-            // Windows background service equivalent would go here.
-            // For now we just write the PID and run in current terminal as a mock daemon.
-            let pid = std::process::id();
-            std::fs::write(&self.pid_file, pid.to_string())
-                .map_err(sprawl_core::SprawlError::Io)?;
-            tracing::info!(
-                "Daemon started successfully (foreground fallback for Windows/non-unix)"
-            );
-            let res = run_loop();
-            let _ = std::fs::remove_file(&self.pid_file);
-            return res;
-        }
+        let pid = std::process::id();
+        std::fs::write(&self.pid_file, pid.to_string())
+            .map_err(sprawl_core::SprawlError::Io)?;
+        tracing::info!("Daemon started successfully (foreground blocking)");
+        
+        let res = run_loop();
+        
+        let _ = std::fs::remove_file(&self.pid_file);
+        res
     }
 
     pub fn stop(&self) -> Result<()> {

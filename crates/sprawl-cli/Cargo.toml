@@ -17,6 +17,13 @@ sprawl-plugin-host = { version = "0.1.0", path = "../sprawl-plugin-host" }
 toml.workspace = true
 serde = { workspace = true, features = ["derive"] }
 sprawl-tui = { version = "0.1.0", path = "../sprawl-tui" }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json.workspace = true
+chrono.workspace = true
+libc.workspace = true
+sprawl-daemon = { version = "0.1.0", path = "../sprawl-daemon" }
+sprawl-sweeper = { version = "0.1.0", path = "../sprawl-sweeper" }
 
 [features]
 default = []
