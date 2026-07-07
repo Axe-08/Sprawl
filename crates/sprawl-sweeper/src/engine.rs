@@ -124,8 +124,17 @@ impl SweeperEngine {
     }
 
     pub fn restore(&self, target_path: &Path, archive_path: &Path) -> Result<()> {
-        if target_path.exists() {
-            fs::remove_file(target_path)?; // Remove symlink
+        if target_path.symlink_metadata().is_ok() {
+            #[cfg(windows)]
+            {
+                if let Err(_) = fs::remove_file(target_path) {
+                    fs::remove_dir(target_path)?;
+                }
+            }
+            #[cfg(not(windows))]
+            {
+                fs::remove_file(target_path)?;
+            }
         }
         if archive_path.exists() {
             fs::rename(archive_path, target_path)?; // Move back
