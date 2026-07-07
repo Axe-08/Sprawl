@@ -56,15 +56,23 @@ impl RamMonitor for SysRamMonitor {
 
 pub const INDEXER_RAM_THRESHOLD_MB: u64 = 1024;
 
-// Mock LanceDB connection for MVP testing
+pub trait VectorDatabase: Send + Sync {
+    fn search(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<SearchResult>>;
+}
+
+#[cfg(any(test, feature = "mock-backend"))]
 pub struct MockDatabase;
+
+#[cfg(any(test, feature = "mock-backend"))]
 impl MockDatabase {
     pub fn connect(_path: &str) -> Result<Self> {
         Ok(MockDatabase)
     }
+}
 
-    pub fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
-        // Return dummy results for testing
+#[cfg(any(test, feature = "mock-backend"))]
+impl VectorDatabase for MockDatabase {
+    fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
         Ok(vec![SearchResult {
             project_id: "test_proj".into(),
             file_path: "src/main.rs".into(),
@@ -77,23 +85,29 @@ impl MockDatabase {
 }
 
 pub struct Archivist {
-    db: MockDatabase,
+    db: Box<dyn VectorDatabase>,
     pub indexer_handle: Option<JoinHandle<()>>,
 }
 
 impl Archivist {
-    pub fn new() -> Result<Self> {
+    #[cfg(any(test, feature = "mock-backend"))]
+    pub fn new_mock() -> Result<Self> {
         let db_path = sprawl_data_dir()
             .map_err(|e| ArchivistError::Database(e.to_string()))?
             .join("vector_store");
-
         std::fs::create_dir_all(&db_path)?;
-
         let db = MockDatabase::connect(&db_path.to_string_lossy())?;
         Ok(Self {
-            db,
+            db: Box::new(db),
             indexer_handle: None,
         })
+    }
+
+    pub fn new(db: Box<dyn VectorDatabase>) -> Self {
+        Self {
+            db,
+            indexer_handle: None,
+        }
     }
 
     pub fn chunk_file(path: &Path) -> Result<Vec<TextChunk>> {
@@ -207,7 +221,7 @@ mod tests {
 
     #[test]
     fn test_indexer_suspends_when_ram_is_low() {
-        let mut archivist = Archivist::new().unwrap();
+        let mut archivist = Archivist::new_mock().unwrap();
         archivist.start_background_indexer(LowRamMonitor).unwrap();
 
         // Wait for thread to complete its limited test iterations
@@ -247,7 +261,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_returns_relevant_results() {
-        let archivist = Archivist::new().unwrap();
+        let archivist = Archivist::new_mock().unwrap();
         let results = archivist.search("query", 5).await.unwrap();
 
         assert!(!results.is_empty());

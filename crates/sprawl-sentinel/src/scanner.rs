@@ -3,32 +3,55 @@ use crate::entropy::shannon_entropy;
 use sprawl_core::config::domain::NoisePattern;
 use zeroize::Zeroize;
 
-// Stubbed dependencies for M10 scaffold. Will map to actual implementations later.
-pub struct KeyringStoreStub;
-impl KeyringStoreStub {
-    pub fn vault_secret(&self, _val: &str) -> String {
+pub trait KeyringBackend: Send + Sync {
+    fn vault_secret(&self, val: &str) -> String;
+}
+
+pub trait LedgerBackend: Send + Sync {
+    fn save_secret(&self, hash: &str, keyring_ref: &str);
+    fn queue_ambiguous(&self, val: &str);
+}
+
+#[cfg(any(test, feature = "mock-backend"))]
+pub struct MockKeyringStore;
+
+#[cfg(any(test, feature = "mock-backend"))]
+impl KeyringBackend for MockKeyringStore {
+    fn vault_secret(&self, _val: &str) -> String {
         "mock_keyring_ref_123".to_string()
     }
 }
 
-pub struct LedgerStub;
-impl LedgerStub {
-    pub fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
-    pub fn queue_ambiguous(&self, _val: &str) {}
+#[cfg(any(test, feature = "mock-backend"))]
+pub struct MockLedger;
+
+#[cfg(any(test, feature = "mock-backend"))]
+impl LedgerBackend for MockLedger {
+    fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
+    fn queue_ambiguous(&self, _val: &str) {}
 }
 
 pub struct SentinelScanner {
     _noise_patterns: Vec<NoisePattern>,
-    keyring: KeyringStoreStub,
-    ledger: LedgerStub,
+    keyring: Box<dyn KeyringBackend>,
+    ledger: Box<dyn LedgerBackend>,
 }
 
 impl SentinelScanner {
-    pub fn new(noise_patterns: Vec<NoisePattern>) -> Self {
+    #[cfg(any(test, feature = "mock-backend"))]
+    pub fn new_mock(noise_patterns: Vec<NoisePattern>) -> Self {
         Self {
             _noise_patterns: noise_patterns,
-            keyring: KeyringStoreStub,
-            ledger: LedgerStub,
+            keyring: Box::new(MockKeyringStore),
+            ledger: Box::new(MockLedger),
+        }
+    }
+
+    pub fn new(noise_patterns: Vec<NoisePattern>, keyring: Box<dyn KeyringBackend>, ledger: Box<dyn LedgerBackend>) -> Self {
+        Self {
+            _noise_patterns: noise_patterns,
+            keyring,
+            ledger,
         }
     }
 
@@ -48,7 +71,12 @@ impl SentinelScanner {
         match classification.status {
             SecretClassification::KnownProvider(_provider_name) => {
                 // M10 Flow: Vault immediately
+                #[cfg(any(test, feature = "mock-backend"))]
                 let _hash = "mock_sha256_hash"; // Implementation detail
+                
+                #[cfg(not(any(test, feature = "mock-backend")))]
+                let _hash = "TODO:real_sha256_hash"; // Implementation detail
+                
                 let keyring_ref = self.keyring.vault_secret(&raw_value);
                 self.ledger.save_secret(_hash, &keyring_ref);
 
@@ -74,7 +102,7 @@ mod tests {
     fn test_zeroize_after_vaulting() {
         // Technically this tests that the method compiles and runs without panicking.
         // A direct memory check is difficult in safe Rust.
-        let scanner = SentinelScanner::new(vec![]);
+        let scanner = SentinelScanner::new_mock(vec![]);
 
         let mut fake_stripe_key = "sk_live_".to_string();
         for _ in 0..30 {

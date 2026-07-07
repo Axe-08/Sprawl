@@ -17,3 +17,8 @@ sprawl-inference = { path = "../sprawl-inference" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+sprawl-inference = { path = "../sprawl-inference", features = ["mock-backend"] }
+
+[features]
+default = []
+mock-backend = []

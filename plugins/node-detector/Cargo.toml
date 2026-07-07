@@ -1,0 +1,18 @@
+[package]
+name = "node-detector"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+wit-bindgen = { version = "0.44.0", features = [] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+[lib]
+crate-type = ["cdylib"]
+
+[package.metadata.component]
+package = "component:node-detector"
+
+[package.metadata.component.target]
+path = "../wit"

@@ -102,7 +102,8 @@ mod tests {
         // Artificially simulate 0 debounce duration for testing flush state
         dedup.debounce_duration = Duration::from_millis(0);
 
-        let project_root = PathBuf::from("/mock/project");
+        let temp_dir = tempfile::tempdir().unwrap();
+        let project_root = temp_dir.path().to_path_buf();
         let file1 = project_root.join("package.json");
         let file2 = project_root.join("index.js");
 

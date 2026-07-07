@@ -4,6 +4,7 @@ members = [
     "crates/*",
     "tests"
 ]
+exclude = ["plugins/*"]
 
 [workspace.package]
 version = "0.1.0"

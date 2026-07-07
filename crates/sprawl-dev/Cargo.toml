@@ -1,0 +1,12 @@
+[package]
+name = "sprawl-dev"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+sprawl-core = { path = "../sprawl-core" }
+sprawl-archivist = { path = "../sprawl-archivist", features = ["mock-backend"] }
+sprawl-sentinel = { path = "../sprawl-sentinel", features = ["mock-backend"] }
+sprawl-inference = { path = "../sprawl-inference", features = ["mock-backend"] }

@@ -14,3 +14,7 @@ tokio.workspace = true
 
 [dev-dependencies]
 tempfile = "3.10"
+
+[features]
+default = []
+mock-backend = []

@@ -13,3 +13,15 @@ sprawl-archaeologist = { version = "0.1.0", path = "../sprawl-archaeologist" }
 sprawl-inference = { version = "0.1.0", path = "../sprawl-inference" }
 sprawl-core = { version = "0.1.0", path = "../sprawl-core" }
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+sprawl-plugin-host = { version = "0.1.0", path = "../sprawl-plugin-host" }
+toml.workspace = true
+serde = { workspace = true, features = ["derive"] }
+sprawl-tui = { version = "0.1.0", path = "../sprawl-tui" }
+
+[features]
+default = []
+mock-backend = [
+    "sprawl-sentinel/mock-backend",
+    "sprawl-inference/mock-backend"
+]
+debug = ["mock-backend"]

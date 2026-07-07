@@ -6,6 +6,8 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use uuid::Uuid;
 
+mod config;
+
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
 struct Cli {
@@ -46,6 +48,8 @@ enum Commands {
         #[arg(long)]
         deep: bool,
     },
+    /// Start the Terminal UI
+    Ui,
 }
 
 #[tokio::main]
@@ -138,7 +142,54 @@ async fn main() {
                     Err(e) => eprintln!("Analysis failed: {}", e),
                 }
             } else {
-                println!("Use --deep for Archaeologist L2/L3 analysis.");
+                println!("Running Archaeologist Fast Path (WASM plugins)...");
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                let plugin_dir = PathBuf::from(home).join(".sprawl").join("plugins");
+                
+                let host = sprawl_plugin_host::PluginHost::new().expect("Failed to init PluginHost");
+                let mut registry = sprawl_plugin_host::PluginRegistry::new();
+                
+                if let Ok(entries) = std::fs::read_dir(&plugin_dir) {
+                    for entry in entries.flatten() {
+                        let path = entry.path();
+                        if path.extension().and_then(|s| s.to_str()) == Some("wasm") {
+                            let name = path.file_stem().unwrap().to_string_lossy().to_string();
+                            if let Ok(plugin) = host.load_plugin(&path, &name) {
+                                registry.register(plugin);
+                            }
+                        }
+                    }
+                }
+                
+                let arch = sprawl_archaeologist::Archaeologist::new(host, registry);
+                
+                match arch.detect_stack(dir).await {
+                    Ok((Some(primary), _)) => {
+                        println!("Detection successful via fast-path!");
+                        println!("Ecosystem: {}", primary.ecosystem);
+                        println!("Reproducible: {}", primary.reproducibility.is_reproducible);
+                        if !primary.reproducibility.is_reproducible {
+                            println!("Evidence against reproducibility:");
+                            for ev in primary.reproducibility.evidence {
+                                println!("  - {}", ev);
+                            }
+                        }
+                        println!("Entry points: {:?}", primary.entry_points);
+                        println!("Dependencies: {} found", primary.dependencies.len());
+                    }
+                    Ok((None, _)) => {
+                        println!("No known stack detected via fast-path.");
+                        println!("Hint: Try using `sprawl analyze --deep` for L2 analysis.");
+                    }
+                    Err(e) => {
+                        eprintln!("Fast-path detection failed: {}", e);
+                    }
+                }
+            }
+        }
+        Commands::Ui => {
+            if let Err(e) = sprawl_tui::run() {
+                eprintln!("TUI Error: {}", e);
             }
         }
     }
