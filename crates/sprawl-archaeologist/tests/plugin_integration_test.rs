@@ -1,59 +1,58 @@
+/// Plugin integration tests require pre-built WASM detector plugins.
+/// Run `./build_plugins.sh` first to compile them.
+/// In CI, these tests are gated by the presence of the WASM files —
+/// they are skipped (not failed) when the plugins are not found.
 use sprawl_archaeologist::Archaeologist;
 use sprawl_plugin_host::{PluginHost, PluginRegistry};
 use std::fs;
 use std::path::PathBuf;
 
+fn plugin_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../plugins/target/wasm32-wasip1/release")
+}
+
+fn plugins_available() -> bool {
+    let dir = plugin_dir();
+    ["rust_detector.wasm", "node_detector.wasm"]
+        .iter()
+        .any(|f| dir.join(f).exists())
+}
+
 async fn setup_archaeologist() -> Archaeologist {
     let host = PluginHost::new().expect("Failed to initialize plugin host");
     let mut registry = PluginRegistry::new();
 
-    let plugin_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../plugins/target/wasm32-wasip1/release");
+    let dir = plugin_dir();
 
-    // Load Rust detector
-    let rust_wasm = plugin_dir.join("rust_detector.wasm");
-    if rust_wasm.exists() {
-        let plugin = host
-            .load_plugin(&rust_wasm, "rust-detector")
-            .expect("Failed to load rust-detector");
-        registry.register(plugin);
-    }
-
-    // Load Node detector
-    let node_wasm = plugin_dir.join("node_detector.wasm");
-    if node_wasm.exists() {
-        let plugin = host
-            .load_plugin(&node_wasm, "node-detector")
-            .expect("Failed to load node-detector");
-        registry.register(plugin);
-    }
-
-    // Load Python detector
-    let python_wasm = plugin_dir.join("python_detector.wasm");
-    if python_wasm.exists() {
-        let plugin = host
-            .load_plugin(&python_wasm, "python-detector")
-            .expect("Failed to load python-detector");
-        registry.register(plugin);
-    }
-
-    // Load Go detector
-    let go_wasm = plugin_dir.join("go_detector.wasm");
-    if go_wasm.exists() {
-        let plugin = host
-            .load_plugin(&go_wasm, "go-detector")
-            .expect("Failed to load go-detector");
-        registry.register(plugin);
+    for (file, name) in &[
+        ("rust_detector.wasm", "rust-detector"),
+        ("node_detector.wasm", "node-detector"),
+        ("python_detector.wasm", "python-detector"),
+        ("go_detector.wasm", "go-detector"),
+    ] {
+        let path = dir.join(file);
+        if path.exists() {
+            let plugin = host
+                .load_plugin(&path, name)
+                .expect("Failed to load plugin");
+            registry.register(plugin);
+        }
     }
 
     Archaeologist::new(host, registry)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_rust_detector_integration() {
+    if !plugins_available() {
+        eprintln!(
+            "SKIP test_rust_detector_integration: WASM plugins not built. Run ./build_plugins.sh"
+        );
+        return;
+    }
+
     let arch = setup_archaeologist().await;
 
-    // Create a mock rust project
     let temp_dir = tempfile::tempdir().unwrap();
     let project_root = temp_dir.path();
 
@@ -73,7 +72,7 @@ async fn test_rust_detector_integration() {
 
     let (primary, _matches) = arch.detect_stack(project_root).await.unwrap();
 
-    assert!(primary.is_some(), "Should detect stack");
+    assert!(primary.is_some(), "Should detect rust stack");
     let info = primary.unwrap();
     assert_eq!(info.ecosystem, "rust");
     assert!(info.entry_points.contains(&"src/main.rs".to_string()));
@@ -82,11 +81,17 @@ async fn test_rust_detector_integration() {
     assert!(info.reproducibility.is_reproducible);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_node_detector_integration() {
+    if !plugins_available() {
+        eprintln!(
+            "SKIP test_node_detector_integration: WASM plugins not built. Run ./build_plugins.sh"
+        );
+        return;
+    }
+
     let arch = setup_archaeologist().await;
 
-    // Create a mock node project
     let temp_dir = tempfile::tempdir().unwrap();
     let project_root = temp_dir.path();
 

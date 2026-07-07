@@ -34,11 +34,10 @@ impl Archaeologist {
         &self,
         project_root: &Path,
     ) -> Result<(Option<StackInfo>, Vec<StackInfo>)> {
-        let all_matches = self
-            .plugin_registry
-            .run_discovery(&self.host, project_root)
-            .await
-            .map_err(|e| sprawl_core::SprawlError::Other(format!("Discovery failed: {}", e)))?;
+        let all_matches = tokio::task::block_in_place(|| {
+            self.plugin_registry.run_discovery(&self.host, project_root)
+        })
+        .map_err(|e| sprawl_core::SprawlError::Other(format!("Discovery failed: {}", e)))?;
 
         let primary = all_matches.first().cloned();
         Ok((primary, all_matches))

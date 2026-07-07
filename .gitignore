@@ -8,11 +8,9 @@
 /target/
 **/*.rs.bk
 *.pdb
-Cargo.lock
-# Note: Cargo.lock IS committed for binary crates (this is a binary).
-# Remove the Cargo.lock line above after `cargo init`.
-# Actually, for binary projects Cargo.lock SHOULD be committed.
-# We list it here as a reminder to un-ignore it after init.
+# Cargo.lock IS committed for this binary workspace.
+# This enables reproducible builds and is required by cargo-audit CI.
+
 
 # ---------------------
 # Build artifacts

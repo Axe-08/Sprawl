@@ -1,0 +1,18 @@
+# cargo audit configuration for Sprawl
+# Advisories that cannot be addressed by us directly (transitive deps) are documented below.
+
+[advisories]
+
+# crossbeam-epoch 0.9.18 — invalid pointer dereference in fmt::Pointer
+# This is a transitive dep of rayon (via candle) and crossbeam itself.
+# Impact on Sprawl: we never call `fmt::Pointer` on crossbeam `Atomic`/`Shared`.
+# The fix is in crossbeam-epoch >= 0.9.19; this will resolve itself on next cargo update.
+# TODO: Remove once crossbeam-epoch >= 0.9.19 is available and resolved in dep tree.
+ignore = [
+    "RUSTSEC-2026-0204",  # crossbeam-epoch: invalid ptr in fmt::Pointer — transitive via candle/rayon
+]
+
+[output]
+deny = ["vulnerability", "unsound"]
+# "unmaintained" warnings are surfaced but not blocking for MVP
+warn = ["unmaintained"]

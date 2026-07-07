@@ -11,6 +11,6 @@ anyhow.workspace = true
 thiserror.workspace = true
 
 # Use wasmtime for Component Model support
-wasmtime = { version = "25.0", features = ["component-model"] }
-wasmtime-wasi = "25.0"
+wasmtime = { version = "46.0", features = ["component-model"] }
+wasmtime-wasi = "46.0"
 tracing.workspace = true
