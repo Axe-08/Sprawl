@@ -1,3 +1,15 @@
+//! ## Feature Flags
+//!
+//! - **`mock-backend`** (or `cfg(test)`): Replaces download, sha256, and LLM with fast in-memory
+//!   mocks. Used in all CI runs and `cargo test`.
+//!
+//! - **`inference`**: Compiles in the real Candle GGUF model loader and Phi-3 generation loop.
+//!   Requires a 2.4GB model file at `~/.sprawl/models/`. Enable with
+//!   `cargo build --features inference`. Disabled by default for fast dev builds.
+//!
+//! These are independent: `mock-backend` has priority in tests; `inference` is for the
+//! production binary only.
+
 use sprawl_core::platform::sprawl_data_dir;
 use std::path::{Path, PathBuf};
 use std::sync::mpsc::Sender;
@@ -100,6 +112,13 @@ impl SysInfo for RealSysInfo {
     }
 }
 
+#[cfg(feature = "inference")]
+pub struct LoadedModel {
+    pub weights: candle_transformers::models::quantized_llama::ModelWeights,
+    pub tokenizer: tokenizers::Tokenizer,
+    pub device: candle_core::Device,
+}
+
 pub struct InferenceEngine<S: SysInfo> {
     pub config: ModelConfig,
     pub device_target: DeviceTarget,
@@ -107,7 +126,7 @@ pub struct InferenceEngine<S: SysInfo> {
     sysinfo: S,
 
     #[cfg(feature = "inference")]
-    pub loaded_model: Option<candle_core::quantized::gguf_file::Content>,
+    pub loaded_model: Option<LoadedModel>,
 }
 
 impl<S: SysInfo> InferenceEngine<S> {
@@ -273,9 +292,14 @@ impl<S: SysInfo> InferenceEngine<S> {
         #[cfg(feature = "inference")]
         {
             let mut file = std::fs::File::open(path)?;
-            let model = candle_core::quantized::gguf_file::Content::read(&mut file)
+            let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)
                 .map_err(|e| InferenceError::Other(e.to_string()))?;
-            self.loaded_model = Some(model);
+            let device = candle_core::Device::Cpu;
+            let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            let tokenizer = tokenizers::Tokenizer::from_pretrained("microsoft/Phi-3-mini-4k-instruct", None)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
         }
 
         #[cfg(not(feature = "inference"))]
@@ -307,11 +331,41 @@ impl<S: SysInfo> InferenceEngine<S> {
         let response = {
             #[cfg(feature = "inference")]
             {
-                tracing::warn!(
-                    "Real candle inference is scaffolded but missing full phi3 implementation."
-                );
-                // Return a structured JSON response to satisfy Sentinel's new parser
-                String::from("{\"classification\": \"ambiguous\", \"reason\": \"Candle inference pipeline scaffolded but missing full phi3 implementation\"}")
+                use candle_transformers::generation::LogitsProcessor;
+                use candle_core::Tensor;
+
+                let loaded = self.loaded_model.as_mut()
+                    .ok_or_else(|| InferenceError::Other("Model not loaded".into()))?;
+                
+                // Encode prompt
+                let tokens = loaded.tokenizer.encode(prompt, true)
+                    .map_err(|e| InferenceError::Other(e.to_string()))?;
+                let token_ids = tokens.get_ids().to_vec();
+                
+                // Greedy decode up to 512 tokens
+                let mut all_tokens = token_ids.clone();
+                let mut logits_processor = LogitsProcessor::new(42, Some(0.7), None);
+                let eos_token = loaded.tokenizer.token_to_id("</s>").unwrap_or(2);
+                let mut output = String::new();
+                
+                for _ in 0..512 {
+                    let input = Tensor::new(all_tokens.as_slice(), &loaded.device)
+                        .map_err(|e| InferenceError::Other(e.to_string()))?
+                        .unsqueeze(0)
+                        .map_err(|e| InferenceError::Other(e.to_string()))?;
+                    
+                    let logits = loaded.weights.forward(&input, all_tokens.len() - 1)
+                        .map_err(|e| InferenceError::Other(e.to_string()))?;
+                    let next_token = logits_processor.sample(&logits)
+                        .map_err(|e| InferenceError::Other(e.to_string()))?;
+                    
+                    if next_token == eos_token { break; }
+                    all_tokens.push(next_token);
+                    if let Ok(word) = loaded.tokenizer.decode(&[next_token], true) {
+                        output.push_str(&word);
+                    }
+                }
+                output
             }
             #[cfg(not(feature = "inference"))]
             {

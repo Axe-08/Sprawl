@@ -25,6 +25,10 @@ jobs:
       - name: Build
         run: cargo build --verbose
       - name: Run tests
+        # Note: we intentionally omit --features inference here.
+        # The real Candle LLM path requires a 2.4GB model file that is not present in CI.
+        # Real-inference tests are decorated with #[cfg_attr(not(feature = "inference"), ignore)]
+        # and must be run locally with `cargo test --features inference` after downloading the model.
         run: cargo test --verbose
 
   lint:
