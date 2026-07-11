@@ -11,9 +11,14 @@ use crossterm::{
 use ratatui::{backend::CrosstermBackend, Terminal};
 use std::io;
 
-use crate::app::App;
+use crate::app::{App, AppEvent};
 
 pub fn run() -> io::Result<()> {
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(run_async())
+}
+
+async fn run_async() -> io::Result<()> {
     // Setup terminal
     enable_raw_mode()?;
     let mut stdout = io::stdout();
@@ -23,12 +28,23 @@ pub fn run() -> io::Result<()> {
 
     // Create app
     let mut app = App::new();
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel::<AppEvent>();
 
     // Event loop
+    let mut event_stream = crossterm::event::EventStream::new();
+    use futures::StreamExt;
+
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 
-        events::handle_events(&mut app)?;
+        tokio::select! {
+            Some(Ok(event)) = event_stream.next() => {
+                events::handle_crossterm_event(&mut app, event, tx.clone())?;
+            }
+            Some(event) = rx.recv() => {
+                events::handle_app_event(&mut app, event);
+            }
+        }
 
         if app.should_quit {
             break;

@@ -297,7 +297,8 @@ impl<S: SysInfo> InferenceEngine<S> {
             let device = candle_core::Device::Cpu;
             let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
                 .map_err(|e| InferenceError::Other(e.to_string()))?;
-            let tokenizer = tokenizers::Tokenizer::from_pretrained("microsoft/Phi-3-mini-4k-instruct", None)
+            let tokenizer_path = path.with_file_name("tokenizer.json");
+            let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
                 .map_err(|e| InferenceError::Other(e.to_string()))?;
             self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
         }

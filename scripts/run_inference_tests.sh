@@ -15,6 +15,16 @@ else
   echo "[sprawl] Model already present at $MODEL_DIR/$MODEL_FILE"
 fi
 
+TOKENIZER_FILE="tokenizer.json"
+TOKENIZER_URL="https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/$TOKENIZER_FILE"
+
+if [ ! -f "$MODEL_DIR/$TOKENIZER_FILE" ]; then
+  echo "[sprawl] Downloading tokenizer.json..."
+  curl -L --progress-bar -o "$MODEL_DIR/$TOKENIZER_FILE" "$TOKENIZER_URL"
+else
+  echo "[sprawl] Tokenizer already present at $MODEL_DIR/$TOKENIZER_FILE"
+fi
+
 echo "[sprawl] Running inference tests..."
 cargo test -p sprawl-inference --features inference -- --include-ignored
 cargo test -p sprawl-sentinel --features sprawl-inference/inference -- --include-ignored
