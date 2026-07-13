@@ -11,6 +11,14 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+serde = { workspace = true, optional = true }
+sysinfo = "0.30"
+
+# real-archivist feature deps
+lancedb = { version = "0.10", optional = true }
+ort = { version = "2.0.0-rc.12", features = ["load-dynamic"], optional = true }
+ndarray = { version = "0.15", optional = true }
+reqwest = { version = "0.12", features = ["stream"], optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"
@@ -18,3 +26,4 @@ tempfile = "3.10"
 [features]
 default = []
 mock-backend = []
+real-archivist = ["lancedb", "ort", "ndarray", "reqwest", "serde"]

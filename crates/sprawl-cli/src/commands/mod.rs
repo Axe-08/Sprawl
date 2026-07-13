@@ -1,11 +1,14 @@
 pub mod analyze;
 pub mod bundle;
 pub mod daemon;
+pub mod index;
 pub mod plugin;
 pub mod restore;
-pub mod simulate_revoke;
-pub mod verify;
+pub mod resurrect;
+pub mod profile_machine;
 pub mod scan;
 pub mod search;
-pub mod triage;
+pub mod simulate_revoke;
 pub mod status;
+pub mod triage;
+pub mod verify;

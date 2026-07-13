@@ -46,6 +46,12 @@ pub enum Command {
     Triage(commands::triage::TriageArgs),
     /// Display machine health and background task status
     Status(commands::status::StatusArgs),
+    /// Explicitly control the Archivist background indexer
+    Index(commands::index::IndexArgs),
+    /// Resurrect an archived project with a recovery kit
+    Resurrect(commands::resurrect::ResurrectArgs),
+    /// Profile the machine to generate optimal Sprawl config
+    ProfileMachine(commands::profile_machine::ProfileMachineArgs),
 }
 
 #[tokio::main]
@@ -75,6 +81,9 @@ async fn main() {
         Command::Search(args) => commands::search::handle(args, cli.json).await,
         Command::Triage(args) => commands::triage::handle(args, cli.json),
         Command::Status(args) => commands::status::handle(args, cli.json),
+        Command::Index(args) => commands::index::handle(args, cli.json).await,
+        Command::Resurrect(args) => commands::resurrect::handle(args, cli.json),
+        Command::ProfileMachine(args) => commands::profile_machine::handle(args, cli.json),
         Command::Ui => {
             if let Err(e) = sprawl_tui::run() {
                 Err(sprawl_core::SprawlError::Other(format!("TUI Error: {}", e)))

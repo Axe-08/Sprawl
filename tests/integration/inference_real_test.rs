@@ -10,8 +10,8 @@ impl SysInfo for RealRam {
 ///   1. `--features inference` is enabled
 ///   2. The model file is present at ~/.sprawl/models/
 /// Run via `./scripts/run_inference_tests.sh`
+#[cfg(feature = "real-inference")]
 #[tokio::test]
-#[cfg_attr(not(feature = "inference"), ignore)]
 async fn test_real_phi3_produces_output() {
     let model_path = sprawl_data_dir()
         .unwrap()

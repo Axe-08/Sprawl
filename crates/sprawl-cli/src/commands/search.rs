@@ -17,10 +17,13 @@ pub struct SearchArgs {
 
 pub async fn handle(args: &SearchArgs, is_json: bool) -> Result<()> {
     let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+    #[allow(unused_variables)]
     let data_dir = PathBuf::from(home).join(".sprawl").join("archivist");
     
-    // In M19 this will hook up the real LanceDB. For now, it returns mock data
-    // per the ADRs and mock-backend architecture.
+    #[cfg(feature = "real-archivist")]
+    let archivist = Archivist::new_real(&data_dir).await.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+    
+    #[cfg(not(feature = "real-archivist"))]
     let archivist = Archivist::new_mock().map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
     
     // Auto-triggering indexing is explicitly against ADR-008 extended principles.

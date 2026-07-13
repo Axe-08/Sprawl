@@ -23,7 +23,7 @@ pub enum TriageCommand {
 }
 
 pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
-    let mut sweeper = SweeperEngine::new();
+    let sweeper = SweeperEngine::new();
 
     match &args.command {
         TriageCommand::List => {
@@ -60,7 +60,7 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
-            let mut item = TriageItem {
+            let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),
@@ -100,7 +100,7 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
-            let mut item = TriageItem {
+            let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),
@@ -137,7 +137,7 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
-            let mut item = TriageItem {
+            let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),

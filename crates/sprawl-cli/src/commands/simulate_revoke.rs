@@ -10,7 +10,7 @@ pub struct SimulateRevokeArgs {
 }
 
 pub fn handle(args: &SimulateRevokeArgs, is_json: bool) -> Result<()> {
-    let secret_id = match Uuid::parse_str(&args.key) {
+    let _secret_id = match Uuid::parse_str(&args.key) {
         Ok(id) => id,
         Err(_) => {
             if is_json {

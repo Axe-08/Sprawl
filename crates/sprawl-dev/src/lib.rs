@@ -1,6 +1,6 @@
 pub mod data;
 
-use sprawl_archivist::{SearchResult, VectorDatabase};
+use sprawl_archivist::{Embedder, SearchResult, VectorDatabase};
 use sprawl_core::Result;
 use sprawl_inference::SysInfo;
 use sprawl_sentinel::scanner::{KeyringBackend, LedgerBackend};
@@ -27,6 +27,15 @@ impl VectorDatabase for MockDatabase {
             end_line: 3,
             similarity_score: 0.95,
         }])
+    }
+}
+
+pub struct MockEmbedder;
+
+impl Embedder for MockEmbedder {
+    fn embed(&self, texts: &[&str]) -> sprawl_core::Result<Vec<Vec<f32>>> {
+        // Return dummy embeddings for testing
+        Ok(texts.iter().map(|_| vec![0.1f32; 384]).collect())
     }
 }
 

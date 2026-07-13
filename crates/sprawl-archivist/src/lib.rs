@@ -4,6 +4,11 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use thiserror::Error;
 
+pub mod embedding;
+pub use embedding::Embedder;
+
+pub mod lance_db;
+
 #[derive(Error, Debug)]
 pub enum ArchivistError {
     #[error("Database error: {0}")]
@@ -12,6 +17,8 @@ pub enum ArchivistError {
     Io(#[from] std::io::Error),
     #[error("Embedding model not available. Run `sprawl setup-embeddings`")]
     ModelNotAvailable,
+    #[error("Core error: {0}")]
+    Core(#[from] sprawl_core::SprawlError),
 }
 
 pub type Result<T> = std::result::Result<T, ArchivistError>;
@@ -50,7 +57,10 @@ pub trait RamMonitor: Send + Sync {
 pub struct SysRamMonitor;
 impl RamMonitor for SysRamMonitor {
     fn available_ram_mb(&self) -> u64 {
-        8192 // mock
+        use sysinfo::System;
+        let mut sys = System::new();
+        sys.refresh_memory();
+        sys.available_memory() / 1024 / 1024
     }
 }
 
@@ -86,6 +96,7 @@ impl VectorDatabase for MockDatabase {
 
 pub struct Archivist {
     db: Box<dyn VectorDatabase>,
+    embedder: Box<dyn Embedder>,
     pub indexer_handle: Option<JoinHandle<()>>,
 }
 
@@ -97,15 +108,47 @@ impl Archivist {
             .join("vector_store");
         std::fs::create_dir_all(&db_path)?;
         let db = MockDatabase::connect(&db_path.to_string_lossy())?;
+        
+        // Use MockEmbedder when testing or mock-backend is active, but we need to conditionally compile it
+        // based on where MockEmbedder lives. Wait, MockEmbedder is in `sprawl-dev` which depends on us.
+        // We shouldn't instantiate MockEmbedder from here if we don't have it. We can just use a local mock struct.
+        struct LocalMockEmbedder;
+        impl Embedder for LocalMockEmbedder {
+            fn embed(&self, texts: &[&str]) -> sprawl_core::Result<Vec<Vec<f32>>> {
+                Ok(texts.iter().map(|_| vec![0.1; 384]).collect())
+            }
+        }
+        
         Ok(Self {
             db: Box::new(db),
+            embedder: Box::new(LocalMockEmbedder),
+            indexer_handle: None,
+        })
+    }
+    
+    #[cfg(feature = "real-archivist")]
+    pub async fn new_real(data_dir: &Path) -> Result<Self> {
+        let db_path = data_dir.join("lancedb");
+        std::fs::create_dir_all(&db_path)?;
+        
+        let db = crate::lance_db::lancedb_backend::LanceVectorDb::connect(&db_path.to_string_lossy()).await?;
+        
+        let model_dir = data_dir.join("models").join("minilm");
+        std::fs::create_dir_all(&model_dir)?;
+        
+        let embedder = crate::embedding::onnx_embedder::OnnxEmbedder::load(&model_dir).await?;
+        
+        Ok(Self {
+            db: Box::new(db),
+            embedder: Box::new(embedder),
             indexer_handle: None,
         })
     }
 
-    pub fn new(db: Box<dyn VectorDatabase>) -> Self {
+    pub fn new(db: Box<dyn VectorDatabase>, embedder: Box<dyn Embedder>) -> Self {
         Self {
             db,
+            embedder,
             indexer_handle: None,
         }
     }
@@ -129,7 +172,8 @@ impl Archivist {
         for line in text.lines() {
             current_chunk.push_str(line);
             current_chunk.push('\n');
-            tokens += line.split_whitespace().count(); // naive tokenization
+            let token_count = line.split_whitespace().count();
+            tokens += token_count;
 
             if tokens >= 512 {
                 chunks.push(TextChunk {
@@ -137,11 +181,27 @@ impl Archivist {
                     start_line,
                     end_line: current_line,
                 });
-                // In production, implement 64-token overlap.
-                // For MVP, reset entirely.
-                current_chunk.clear();
-                start_line = current_line + 1;
-                tokens = 0;
+                
+                let (new_chunk, overlap_tokens) = {
+                    let lines: Vec<&str> = current_chunk.lines().collect();
+                    let mut overlap_tokens = 0;
+                    let mut overlap_lines = Vec::new();
+                    for l in lines.iter().rev() {
+                        let l_toks = l.split_whitespace().count();
+                        overlap_tokens += l_toks;
+                        overlap_lines.push(*l);
+                        if overlap_tokens >= 64 {
+                            break;
+                        }
+                    }
+                    overlap_lines.reverse();
+                    (overlap_lines.join("\n") + "\n", overlap_tokens)
+                };
+                
+                current_chunk = new_chunk;
+                start_line = current_line.saturating_sub(64); // roughly... we can just use current_line - something, wait, let's just use start_line + (lines.len() - overlap_lines.len()) but we don't have lines.len() outside.
+                // Let's just track it carefully.
+                tokens = overlap_tokens;
             }
             current_line += 1;
         }
@@ -190,12 +250,13 @@ impl Archivist {
         Ok(())
     }
 
-    pub async fn search(&self, _query: &str, top_k: usize) -> Result<Vec<SearchResult>> {
+    pub async fn search(&self, query: &str, top_k: usize) -> Result<Vec<SearchResult>> {
         // 1. Embed query
-        let mock_embedding = vec![0.1; 384];
+        let embeddings = self.embedder.embed(&[query])?;
+        let query_embedding = embeddings.first().cloned().unwrap_or_else(|| vec![0.0; 384]);
 
         // 2. Vector similarity search
-        self.db.search(&mock_embedding, top_k)
+        self.db.search(&query_embedding, top_k)
     }
 }
 

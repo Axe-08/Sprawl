@@ -40,6 +40,7 @@ sprawl-daemon = { path = "../crates/sprawl-daemon" }
 sprawl-inference = { path = "../crates/sprawl-inference" }
 sprawl-tui = { path = "../crates/sprawl-tui" }
 sprawl-cli = { path = "../crates/sprawl-cli" }
+sprawl-archivist = { path = "../crates/sprawl-archivist" }
 tempfile = "3.10"
 uuid = { version = "1.2", features = ["v4"] }
 tokio = { workspace = true }
@@ -55,3 +56,19 @@ path = "integration/config_merge_test.rs"
 [[test]]
 name = "cli_commands_test"
 path = "integration/cli_commands_test.rs"
+
+[[test]]
+name = "archivist_real_test"
+path = "integration/archivist_real_test.rs"
+
+[[test]]
+name = "resurrect_test"
+path = "integration/resurrect_test.rs"
+
+[[test]]
+name = "profile_machine_test"
+path = "integration/profile_machine_test.rs"
+
+[features]
+real-archivist = ["sprawl-archivist/real-archivist"]
+real-inference = ["sprawl-inference/inference"]

@@ -11,7 +11,11 @@ pub struct DaemonArgs {
 #[derive(Subcommand)]
 pub enum DaemonAction {
     /// Start the background watcher daemon
-    Start,
+    Start {
+        /// Automatically start the background indexer
+        #[arg(long)]
+        auto_index: bool,
+    },
     /// Stop the running daemon
     Stop {
         /// Send SIGKILL instead of SIGTERM
@@ -24,13 +28,42 @@ pub enum DaemonAction {
 
 pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
     match &args.action {
-        DaemonAction::Start => {
+        DaemonAction::Start { auto_index } => {
             let ctx = sprawl_daemon::process::DaemonContext::new()?;
             if !is_json {
                 println!("Starting daemon...");
             }
-            ctx.start(|| {
+            
+            let auto_index_flag = *auto_index;
+            
+            ctx.start(move || {
                 let rt = tokio::runtime::Handle::current();
+                
+                if auto_index_flag {
+                    rt.spawn(async move {
+                        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                        #[allow(unused_variables)]
+                        let data_dir = std::path::PathBuf::from(home).join(".sprawl").join("archivist");
+                        
+                        #[cfg(feature = "real-archivist")]
+                        let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
+                        #[cfg(not(feature = "real-archivist"))]
+                        let archivist_result = sprawl_archivist::Archivist::new_mock();
+                        
+                        match archivist_result {
+                            Ok(mut archivist) => {
+                                tracing::info!("Starting background indexer on daemon boot");
+                                if let Err(e) = archivist.start_background_indexer(sprawl_archivist::SysRamMonitor) {
+                                    tracing::error!("Failed to start indexer: {}", e);
+                                }
+                            }
+                            Err(e) => {
+                                tracing::error!("Failed to initialize archivist for auto-indexing: {}", e);
+                            }
+                        }
+                    });
+                }
+                
                 rt.block_on(async {
                     if let Err(e) = sprawl_daemon::run_daemon_loop().await {
                         tracing::error!("Daemon loop failed: {}", e);

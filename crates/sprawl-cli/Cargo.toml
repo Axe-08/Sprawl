@@ -26,11 +26,12 @@ sprawl-daemon = { version = "0.1.0", path = "../sprawl-daemon" }
 sprawl-sweeper = { version = "0.1.0", path = "../sprawl-sweeper" }
 sprawl-dev = { version = "0.1.0", path = "../sprawl-dev" }
 sprawl-archivist = { version = "0.1.0", path = "../sprawl-archivist" }
+arboard = "3.6.1"
+which = "8.0.4"
 
 [features]
 default = []
-mock-backend = [
-    "sprawl-sentinel/mock-backend",
-    "sprawl-inference/mock-backend"
-]
+mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend"]
 debug = ["mock-backend"]
+real-inference = ["sprawl-inference/inference"]
+real-archivist = ["sprawl-archivist/real-archivist"]
