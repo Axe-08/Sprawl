@@ -19,12 +19,38 @@ pub struct SweeperInboxState {
     pub items: Vec<String>,
 }
 
-pub struct SentinelInboxState {
-    // Scaffold for M17
+use sprawl_sentinel::llm::DiscoveredSecret;
+use sprawl_sentinel::classify::SecretClassification;
+use sprawl_archivist::SearchResult;
+use uuid::Uuid;
+
+pub enum AppEvent {
+    BatchClassifyResult(Vec<(Uuid, SecretClassification)>),
+    SearchResult(Vec<SearchResult>),
+    SearchError(String),
 }
 
+pub struct InboxItem {
+    pub secret: DiscoveredSecret,
+    pub review: Option<SecretClassification>,
+    pub expanded: bool,
+}
+
+pub struct SentinelInboxState {
+    pub items: Vec<InboxItem>,
+    pub selected_index: usize,
+    pub batch_running: bool,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum SearchPhase { Input, Results }
+
 pub struct SearchState {
-    // Scaffold for M17
+    pub query: String,
+    pub phase: SearchPhase,
+    pub results: Vec<SearchResult>,
+    pub selected_index: usize,
+    pub is_searching: bool,
 }
 
 pub struct App {
@@ -35,6 +61,7 @@ pub struct App {
     pub search: SearchState,
     pub theme: ThemeColors,
     pub should_quit: bool,
+    pub input_mode: bool,
 }
 
 impl Default for App {
@@ -63,10 +90,56 @@ impl App {
                 #[cfg(not(feature = "demo-data"))]
                 items: Vec::new(),
             },
-            sentinel: SentinelInboxState {},
-            search: SearchState {},
+            sentinel: SentinelInboxState {
+                #[cfg(feature = "demo-data")]
+                items: vec![
+                    InboxItem {
+                        secret: DiscoveredSecret {
+                            id: Uuid::new_v4(),
+                            raw_value: "Vq1B9x...F5t".to_string(),
+                            filepath: ".env:14".to_string(),
+                        },
+                        review: None,
+                        expanded: false,
+                    },
+                    InboxItem {
+                        secret: DiscoveredSecret {
+                            id: Uuid::new_v4(),
+                            raw_value: "aXk9Pm...4sR".to_string(),
+                            filepath: ".env:27".to_string(),
+                        },
+                        review: None,
+                        expanded: false,
+                    },
+                ],
+                #[cfg(not(feature = "demo-data"))]
+                items: Vec::new(),
+                selected_index: 0,
+                batch_running: false,
+            },
+            search: SearchState {
+                query: String::new(),
+                phase: SearchPhase::Input,
+                results: Vec::new(),
+                selected_index: 0,
+                is_searching: false,
+            },
             theme: ThemeColors::from_terminal(),
             should_quit: false,
+            input_mode: false,
+        }
+    }
+
+    pub fn sentinel_accept_selected(&mut self) {
+        if let Some(item) = self.sentinel.items.get_mut(self.sentinel.selected_index) {
+            item.review = Some(SecretClassification::KnownProvider("User".to_string()));
+            // Sync with keyring would happen here or via event loop
+        }
+    }
+
+    pub fn sentinel_reject_selected(&mut self) {
+        if let Some(item) = self.sentinel.items.get_mut(self.sentinel.selected_index) {
+            item.review = Some(SecretClassification::FilteredNoise("User".to_string()));
         }
     }
 

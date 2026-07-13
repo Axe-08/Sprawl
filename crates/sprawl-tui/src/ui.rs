@@ -7,6 +7,7 @@ use ratatui::{
 };
 
 use crate::app::{App, Tab};
+use crate::views;
 
 pub fn draw(f: &mut Frame, app: &mut App) {
     let size = f.area();
@@ -100,22 +101,26 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
             }
         }
         Tab::SentinelInbox => {
-            let p = Paragraph::new("Sentinel Inbox Scaffold (M17)").block(block);
-            f.render_widget(p, area);
+            views::sentinel::draw(f, app, area);
         }
         Tab::SemanticSearch => {
-            let p = Paragraph::new("Semantic Search Scaffold (M17)").block(block);
-            f.render_widget(p, area);
+            views::search::draw(f, app, area);
         }
     }
 }
 
 fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
     let footer_text = match app.current_tab {
-        Tab::Dashboard => " [q] Quit  [Tab] Next ",
-        Tab::SweeperInbox => " [X] Nuke  [A] Archive  [S] Snooze  [q] Quit ",
-        Tab::SentinelInbox => " [k] Known secret  [n] Noise  [W] Batch Classify ",
-        Tab::SemanticSearch => " [Esc] Cancel search ",
+        Tab::Dashboard => " [q] Quit  [Tab] Next ".to_string(),
+        Tab::SweeperInbox => " [X] Nuke  [A] Archive  [S] Snooze  [q] Quit ".to_string(),
+        Tab::SentinelInbox => {
+            if app.sentinel.batch_running {
+                " [W] Batch Classify (Running...) ".to_string()
+            } else {
+                " [k] Known secret  [n] Noise  [W] Batch Classify ".to_string()
+            }
+        },
+        Tab::SemanticSearch => " [Esc] Cancel search ".to_string(),
     };
 
     let p = Paragraph::new(footer_text)

@@ -28,13 +28,19 @@ path = "integration/sentinel_scan_test.rs"
 name = "inference_real_test"
 path = "integration/inference_real_test.rs"
 
+[[test]]
+name = "tui_state_test"
+path = "integration/tui_state_test.rs"
+
 [dependencies]
 sprawl-core = { path = "../crates/sprawl-core" }
 sprawl-sweeper = { path = "../crates/sprawl-sweeper" }
 sprawl-sentinel = { path = "../crates/sprawl-sentinel" }
 sprawl-daemon = { path = "../crates/sprawl-daemon" }
 sprawl-inference = { path = "../crates/sprawl-inference" }
+sprawl-tui = { path = "../crates/sprawl-tui" }
 tempfile = "3.10"
+uuid = { version = "1.2", features = ["v4"] }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 

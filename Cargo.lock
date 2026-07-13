@@ -823,6 +823,7 @@ dependencies = [
  "crossterm_winapi",
  "derive_more",
  "document-features",
+ "futures-core",
  "mio 1.2.1",
  "parking_lot",
  "rustix",
@@ -4060,8 +4061,10 @@ dependencies = [
  "sprawl-inference",
  "sprawl-sentinel",
  "sprawl-sweeper",
+ "sprawl-tui",
  "tempfile",
  "tokio",
+ "uuid",
 ]
 
 [[package]]
