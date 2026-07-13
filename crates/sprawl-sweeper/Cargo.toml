@@ -13,4 +13,10 @@ tracing.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
+criterion = "0.8.2"
 tempfile = "3.10"
+
+[[bench]]
+name = "safety_gate_bench"
+harness = false
+

@@ -4,7 +4,7 @@ members = [
     "crates/*",
     "tests"
 ]
-exclude = ["plugins/*"]
+exclude = ["plugins/*", "crates/sprawl-plugin-host/fuzz"]
 
 [workspace.package]
 version = "0.1.0"

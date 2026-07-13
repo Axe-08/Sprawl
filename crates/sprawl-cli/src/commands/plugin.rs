@@ -12,7 +12,12 @@ pub struct PluginArgs {
 #[derive(Subcommand)]
 pub enum PluginAction {
     /// Install a WASM StackDetector plugin from a local path
-    Install { source: PathBuf },
+    Install {
+        source: PathBuf,
+        /// Optional SHA-256 checksum to verify the plugin before installation
+        #[arg(long)]
+        checksum: Option<String>,
+    },
     /// List all installed plugins
     List,
     /// Remove an installed plugin by name
@@ -32,7 +37,7 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
     }
 
     match &args.action {
-        PluginAction::Install { source } => {
+        PluginAction::Install { source, checksum } => {
             if !source.exists() {
                 return Err(sprawl_core::SprawlError::Other(
                     "Source file does not exist".into(),
@@ -42,6 +47,28 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
                 return Err(sprawl_core::SprawlError::Other(
                     "Only .wasm files are supported".into(),
                 ));
+            }
+
+            if let Some(expected_hash) = checksum {
+                let bytes = std::fs::read(source).map_err(|e| {
+                    sprawl_core::SprawlError::Other(format!("Failed to read source file: {}", e))
+                })?;
+                use sha2::Digest;
+                let mut hasher = sha2::Sha256::new();
+                hasher.update(&bytes);
+                let result = hasher.finalize();
+                let computed_hash = hex::encode(result);
+
+                if computed_hash != *expected_hash {
+                    return Err(sprawl_core::SprawlError::Other(format!(
+                        "Checksum verification failed. Expected {}, got {}",
+                        expected_hash, computed_hash
+                    )));
+                }
+                
+                if !is_json {
+                    println!("Checksum verified successfully.");
+                }
             }
 
             let name = source.file_stem().unwrap().to_string_lossy().to_string();
