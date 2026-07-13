@@ -38,6 +38,14 @@ pub enum Command {
     Analyze(commands::analyze::AnalyzeArgs),
     /// Start the Terminal UI
     Ui,
+    /// Scan a directory for ambiguous secrets
+    Scan(commands::scan::ScanArgs),
+    /// Perform a semantic search via the Archivist
+    Search(commands::search::SearchArgs),
+    /// Triage Sweeper inbox items
+    Triage(commands::triage::TriageArgs),
+    /// Display machine health and background task status
+    Status(commands::status::StatusArgs),
 }
 
 #[tokio::main]
@@ -63,6 +71,10 @@ async fn main() {
         Command::SimulateRevoke(args) => commands::simulate_revoke::handle(args, cli.json),
         Command::Bundle(args) => commands::bundle::handle(args, cli.json),
         Command::Analyze(args) => commands::analyze::handle(args, cli.json).await,
+        Command::Scan(args) => commands::scan::handle(args, cli.json),
+        Command::Search(args) => commands::search::handle(args, cli.json).await,
+        Command::Triage(args) => commands::triage::handle(args, cli.json),
+        Command::Status(args) => commands::status::handle(args, cli.json),
         Command::Ui => {
             if let Err(e) = sprawl_tui::run() {
                 Err(sprawl_core::SprawlError::Other(format!("TUI Error: {}", e)))
@@ -85,10 +97,10 @@ async fn main() {
             eprintln!("Error: {}", e);
         }
 
-        let msg = e.to_string();
-        if msg.contains("INSUFFICIENT HEADROOM") {
+        let msg = e.to_string().to_lowercase();
+        if msg.contains("insufficient headroom") {
             process::exit(3);
-        } else if msg.contains("safety gate") || msg.contains("Locked") {
+        } else if msg.contains("safety gate") || msg.contains("locked") {
             process::exit(2);
         } else {
             process::exit(1);

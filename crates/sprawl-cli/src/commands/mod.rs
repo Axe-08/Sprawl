@@ -5,3 +5,7 @@ pub mod plugin;
 pub mod restore;
 pub mod simulate_revoke;
 pub mod verify;
+pub mod scan;
+pub mod search;
+pub mod triage;
+pub mod status;

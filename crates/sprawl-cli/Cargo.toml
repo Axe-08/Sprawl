@@ -24,6 +24,8 @@ chrono.workspace = true
 libc.workspace = true
 sprawl-daemon = { version = "0.1.0", path = "../sprawl-daemon" }
 sprawl-sweeper = { version = "0.1.0", path = "../sprawl-sweeper" }
+sprawl-dev = { version = "0.1.0", path = "../sprawl-dev" }
+sprawl-archivist = { version = "0.1.0", path = "../sprawl-archivist" }
 
 [features]
 default = []

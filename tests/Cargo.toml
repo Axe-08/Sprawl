@@ -39,11 +39,19 @@ sprawl-sentinel = { path = "../crates/sprawl-sentinel" }
 sprawl-daemon = { path = "../crates/sprawl-daemon" }
 sprawl-inference = { path = "../crates/sprawl-inference" }
 sprawl-tui = { path = "../crates/sprawl-tui" }
+sprawl-cli = { path = "../crates/sprawl-cli" }
 tempfile = "3.10"
 uuid = { version = "1.2", features = ["v4"] }
 tokio = { workspace = true }
 anyhow = { workspace = true }
+assert_cmd = "2.0.12"
+predicates = "3.0.4"
+serde_json = { workspace = true }
 
 [[test]]
 name = "config_merge_test"
 path = "integration/config_merge_test.rs"
+
+[[test]]
+name = "cli_commands_test"
+path = "integration/cli_commands_test.rs"
