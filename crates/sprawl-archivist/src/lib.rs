@@ -1,4 +1,4 @@
-use sprawl_core::platform::sprawl_data_dir;
+
 use std::path::Path;
 use std::thread::JoinHandle;
 use std::time::Duration;
@@ -70,30 +70,6 @@ pub trait VectorDatabase: Send + Sync {
     fn search(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<SearchResult>>;
 }
 
-#[cfg(any(test, feature = "mock-backend"))]
-pub struct MockDatabase;
-
-#[cfg(any(test, feature = "mock-backend"))]
-impl MockDatabase {
-    pub fn connect(_path: &str) -> Result<Self> {
-        Ok(MockDatabase)
-    }
-}
-
-#[cfg(any(test, feature = "mock-backend"))]
-impl VectorDatabase for MockDatabase {
-    fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
-        Ok(vec![SearchResult {
-            project_id: "test_proj".into(),
-            file_path: "src/main.rs".into(),
-            chunk_text: "fn main() { println!(\"Hello\"); }".into(),
-            start_line: 1,
-            end_line: 3,
-            similarity_score: 0.95,
-        }])
-    }
-}
-
 pub struct Archivist {
     db: Box<dyn VectorDatabase>,
     embedder: Box<dyn Embedder>,
@@ -101,31 +77,6 @@ pub struct Archivist {
 }
 
 impl Archivist {
-    #[cfg(any(test, feature = "mock-backend"))]
-    pub fn new_mock() -> Result<Self> {
-        let db_path = sprawl_data_dir()
-            .map_err(|e| ArchivistError::Database(e.to_string()))?
-            .join("vector_store");
-        std::fs::create_dir_all(&db_path)?;
-        let db = MockDatabase::connect(&db_path.to_string_lossy())?;
-        
-        // Use MockEmbedder when testing or mock-backend is active, but we need to conditionally compile it
-        // based on where MockEmbedder lives. Wait, MockEmbedder is in `sprawl-dev` which depends on us.
-        // We shouldn't instantiate MockEmbedder from here if we don't have it. We can just use a local mock struct.
-        struct LocalMockEmbedder;
-        impl Embedder for LocalMockEmbedder {
-            fn embed(&self, texts: &[&str]) -> sprawl_core::Result<Vec<Vec<f32>>> {
-                Ok(texts.iter().map(|_| vec![0.1; 384]).collect())
-            }
-        }
-        
-        Ok(Self {
-            db: Box::new(db),
-            embedder: Box::new(LocalMockEmbedder),
-            indexer_handle: None,
-        })
-    }
-    
     #[cfg(feature = "real-archivist")]
     pub async fn new_real(data_dir: &Path) -> Result<Self> {
         let db_path = data_dir.join("lancedb");
@@ -273,16 +224,30 @@ mod tests {
         }
     }
 
-    struct HighRamMonitor;
-    impl RamMonitor for HighRamMonitor {
-        fn available_ram_mb(&self) -> u64 {
-            4096
+    struct LocalMockDatabase;
+    impl VectorDatabase for LocalMockDatabase {
+        fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
+            Ok(vec![SearchResult {
+                project_id: "test_proj".into(),
+                file_path: "src/main.rs".into(),
+                chunk_text: "fn main() { println!(\"Hello\"); }".into(),
+                start_line: 1,
+                end_line: 3,
+                similarity_score: 0.95,
+            }])
+        }
+    }
+
+    struct LocalMockEmbedder;
+    impl Embedder for LocalMockEmbedder {
+        fn embed(&self, texts: &[&str]) -> sprawl_core::Result<Vec<Vec<f32>>> {
+            Ok(texts.iter().map(|_| vec![0.1; 384]).collect())
         }
     }
 
     #[test]
     fn test_indexer_suspends_when_ram_is_low() {
-        let mut archivist = Archivist::new_mock().unwrap();
+        let mut archivist = Archivist::new(Box::new(LocalMockDatabase), Box::new(LocalMockEmbedder));
         archivist.start_background_indexer(LowRamMonitor).unwrap();
 
         // Wait for thread to complete its limited test iterations
@@ -322,7 +287,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_returns_relevant_results() {
-        let archivist = Archivist::new_mock().unwrap();
+        let archivist = Archivist::new(Box::new(LocalMockDatabase), Box::new(LocalMockEmbedder));
         let results = archivist.search("query", 5).await.unwrap();
 
         assert!(!results.is_empty());

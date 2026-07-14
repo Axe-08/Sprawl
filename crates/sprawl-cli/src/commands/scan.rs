@@ -26,7 +26,7 @@ struct Finding {
 
 pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
     // In M18 we use a simple mock traversal to satisfy integration tests.
-    let scanner = SentinelScanner::new_mock(vec![]);
+    let scanner = SentinelScanner::new(vec![], Box::new(sprawl_dev::MockKeyringStore), Box::new(sprawl_dev::MockLedger));
     
     let use_json = is_json || args.json;
 

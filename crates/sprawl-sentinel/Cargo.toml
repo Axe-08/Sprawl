@@ -22,6 +22,7 @@ serde.workspace = true
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 sprawl-inference = { path = "../sprawl-inference", features = ["mock-backend"] }
+sprawl-dev = { path = "../sprawl-dev" }
 
 [features]
 default = []

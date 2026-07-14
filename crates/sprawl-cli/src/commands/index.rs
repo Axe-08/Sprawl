@@ -24,7 +24,7 @@ pub async fn handle(args: &IndexArgs, _is_json: bool) -> Result<()> {
     let mut archivist = Archivist::new_real(&data_dir).await.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
     
     #[cfg(not(feature = "real-archivist"))]
-    let mut archivist = Archivist::new_mock().map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+    let mut archivist = Archivist::new(Box::new(sprawl_dev::MockDatabase), Box::new(sprawl_dev::MockEmbedder));
 
     println!("Starting background indexer...");
     archivist.start_background_indexer(SysRamMonitor).map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;

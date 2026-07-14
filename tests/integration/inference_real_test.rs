@@ -1,7 +1,11 @@
+#[cfg(feature = "real-inference")]
 use sprawl_inference::{InferenceEngine, DeviceTarget, DEFAULT_MODEL, SysInfo};
+#[cfg(feature = "real-inference")]
 use sprawl_core::platform::sprawl_data_dir;
 
+#[cfg(feature = "real-inference")]
 struct RealRam;
+#[cfg(feature = "real-inference")]
 impl SysInfo for RealRam {
     fn available_ram_mb(&self) -> u64 { 16384 }
 }

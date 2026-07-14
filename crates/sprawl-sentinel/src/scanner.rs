@@ -12,24 +12,6 @@ pub trait LedgerBackend: Send + Sync {
     fn queue_ambiguous(&self, val: &str);
 }
 
-#[cfg(any(test, feature = "mock-backend"))]
-pub struct MockKeyringStore;
-
-#[cfg(any(test, feature = "mock-backend"))]
-impl KeyringBackend for MockKeyringStore {
-    fn vault_secret(&self, _val: &str) -> String {
-        "mock_keyring_ref_123".to_string()
-    }
-}
-
-#[cfg(any(test, feature = "mock-backend"))]
-pub struct MockLedger;
-
-#[cfg(any(test, feature = "mock-backend"))]
-impl LedgerBackend for MockLedger {
-    fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
-    fn queue_ambiguous(&self, _val: &str) {}
-}
 
 pub struct SentinelScanner {
     _noise_patterns: Vec<NoisePattern>,
@@ -38,15 +20,6 @@ pub struct SentinelScanner {
 }
 
 impl SentinelScanner {
-    #[cfg(any(test, feature = "mock-backend"))]
-    pub fn new_mock(noise_patterns: Vec<NoisePattern>) -> Self {
-        Self {
-            _noise_patterns: noise_patterns,
-            keyring: Box::new(MockKeyringStore),
-            ledger: Box::new(MockLedger),
-        }
-    }
-
     pub fn new(
         noise_patterns: Vec<NoisePattern>,
         keyring: Box<dyn KeyringBackend>,
@@ -105,11 +78,24 @@ impl SentinelScanner {
 mod tests {
     use super::*;
 
+    struct LocalMockKeyringStore;
+    impl KeyringBackend for LocalMockKeyringStore {
+        fn vault_secret(&self, _val: &str) -> String {
+            "mock_keyring_ref_123".to_string()
+        }
+    }
+
+    struct LocalMockLedger;
+    impl LedgerBackend for LocalMockLedger {
+        fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
+        fn queue_ambiguous(&self, _val: &str) {}
+    }
+
     #[test]
     fn test_zeroize_after_vaulting() {
         // Technically this tests that the method compiles and runs without panicking.
         // A direct memory check is difficult in safe Rust.
-        let scanner = SentinelScanner::new_mock(vec![]);
+        let scanner = SentinelScanner::new(vec![], Box::new(LocalMockKeyringStore), Box::new(LocalMockLedger));
 
         let mut fake_stripe_key = "sk_live_".to_string();
         for _ in 0..30 {

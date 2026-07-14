@@ -1,6 +1,5 @@
 use sprawl_archivist::{Archivist, SysRamMonitor};
-use sprawl_archivist::TextChunk;
-use std::path::Path;
+
 use std::io::Write;
 
 #[test]

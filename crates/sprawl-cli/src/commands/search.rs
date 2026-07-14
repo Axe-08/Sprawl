@@ -24,7 +24,7 @@ pub async fn handle(args: &SearchArgs, is_json: bool) -> Result<()> {
     let archivist = Archivist::new_real(&data_dir).await.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
     
     #[cfg(not(feature = "real-archivist"))]
-    let archivist = Archivist::new_mock().map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+    let archivist = Archivist::new(Box::new(sprawl_dev::MockDatabase), Box::new(sprawl_dev::MockEmbedder));
     
     // Auto-triggering indexing is explicitly against ADR-008 extended principles.
     // However, since it's a mock backend right now, we can just call search directly.

@@ -387,14 +387,14 @@ mod tests {
     struct LowRamMock;
     impl SysInfo for LowRamMock {
         fn available_ram_mb(&self) -> u64 {
-            2048 // 2GB (too low for 3GB model + 1GB margin)
+            2048
         }
     }
 
     struct HighRamMock;
     impl SysInfo for HighRamMock {
         fn available_ram_mb(&self) -> u64 {
-            8192 // 8GB (plenty)
+            8192
         }
     }
 

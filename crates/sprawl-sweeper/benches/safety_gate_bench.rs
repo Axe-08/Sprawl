@@ -1,6 +1,6 @@
 use std::hint::black_box;
 use criterion::{criterion_group, criterion_main, Criterion};
-use sprawl_sweeper::safety_gate::{SafetyGate, nuke_eligible, Ecosystem};
+use sprawl_sweeper::safety_gate::{SafetyGate, Ecosystem};
 use std::path::PathBuf;
 
 fn bench_safety_gate(c: &mut Criterion) {

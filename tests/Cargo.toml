@@ -39,7 +39,6 @@ sprawl-sentinel = { path = "../crates/sprawl-sentinel" }
 sprawl-daemon = { path = "../crates/sprawl-daemon" }
 sprawl-inference = { path = "../crates/sprawl-inference" }
 sprawl-tui = { path = "../crates/sprawl-tui" }
-sprawl-cli = { path = "../crates/sprawl-cli" }
 sprawl-archivist = { path = "../crates/sprawl-archivist" }
 tempfile = "3.10"
 uuid = { version = "1.2", features = ["v4"] }
