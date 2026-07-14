@@ -16,8 +16,11 @@ zeroize = { version = "1", features = ["zeroize_derive"] }
 sprawl-inference = { path = "../sprawl-inference" }
 sha2 = "0.10"
 hex = "0.4"
+chrono = { workspace = true }
 serde_json.workspace = true
-serde.workspace = true
+serde = { workspace = true }
+keyring = "2.3"
+rusqlite = { version = "0.31", features = ["bundled"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }

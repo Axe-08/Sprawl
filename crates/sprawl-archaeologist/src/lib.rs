@@ -18,6 +18,7 @@ pub struct DriftAlert {
 pub struct Archaeologist {
     pub plugin_registry: PluginRegistry,
     pub host: PluginHost,
+    pub db_conn: Option<std::sync::Arc<std::sync::Mutex<rusqlite::Connection>>>,
 }
 
 impl Archaeologist {
@@ -25,7 +26,13 @@ impl Archaeologist {
         Self {
             host,
             plugin_registry,
+            db_conn: None,
         }
+    }
+
+    pub fn with_db(mut self, db_conn: std::sync::Arc<std::sync::Mutex<rusqlite::Connection>>) -> Self {
+        self.db_conn = Some(db_conn);
+        self
     }
 
     /// Detect the stack for a project using the WASM fast path.
@@ -52,12 +59,37 @@ impl Archaeologist {
 
             match primary {
                 Some(_info) => {
-                    // For now we mock the DB interaction. In phase 2 we will upsert into ledger.
                     tracing::info!("Detected stack for project: {}", root.display());
+                    
+                    if let Some(conn_mu) = &self.db_conn {
+                        let conn = conn_mu.lock().unwrap();
+                        let id = uuid::Uuid::new_v4().to_string();
+                        let now = chrono::Utc::now().to_rfc3339();
+                        let ecosystem = _info.ecosystem.clone();
+                        let _ = conn.execute(
+                            "INSERT INTO projects (id, root_path, ecosystem, last_seen, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+                             ON CONFLICT(root_path) DO UPDATE SET last_seen=excluded.last_seen, ecosystem=excluded.ecosystem",
+                            (&id, root.to_string_lossy().to_string(), &ecosystem, &now, &now),
+                        );
+                    }
+                    
                     report.detected += 1;
                 }
                 None => {
                     tracing::warn!("Unknown stack for project: {}", root.display());
+                    
+                    if let Some(conn_mu) = &self.db_conn {
+                        let conn = conn_mu.lock().unwrap();
+                        let id = uuid::Uuid::new_v4().to_string();
+                        let now = chrono::Utc::now().to_rfc3339();
+                        let ecosystem = "Unknown".to_string();
+                        let _ = conn.execute(
+                            "INSERT INTO projects (id, root_path, ecosystem, last_seen, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
+                             ON CONFLICT(root_path) DO UPDATE SET last_seen=excluded.last_seen, ecosystem=excluded.ecosystem",
+                            (&id, root.to_string_lossy().to_string(), &ecosystem, &now, &now),
+                        );
+                    }
+                    
                     report.unknown += 1;
                 }
             }

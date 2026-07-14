@@ -10,3 +10,4 @@ sprawl-core = { path = "../sprawl-core" }
 sprawl-archivist = { path = "../sprawl-archivist", features = ["mock-backend"] }
 sprawl-sentinel = { path = "../sprawl-sentinel", features = ["mock-backend"] }
 sprawl-inference = { path = "../sprawl-inference", features = ["mock-backend"] }
+async-trait = "0.1"

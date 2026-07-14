@@ -73,8 +73,8 @@ pub trait VectorDatabase: Send + Sync {
 }
 
 pub struct Archivist {
-    db: Box<dyn VectorDatabase>,
-    embedder: Box<dyn Embedder>,
+    db: std::sync::Arc<dyn VectorDatabase>,
+    embedder: std::sync::Arc<dyn Embedder>,
     pub indexer_handle: Option<JoinHandle<()>>,
 }
 
@@ -92,13 +92,13 @@ impl Archivist {
         let embedder = crate::embedding::candle_embedder::CandleEmbedder::load(&model_dir).await?;
         
         Ok(Self {
-            db: Box::new(db),
-            embedder: Box::new(embedder),
+            db: std::sync::Arc::new(db),
+            embedder: std::sync::Arc::new(embedder),
             indexer_handle: None,
         })
     }
 
-    pub fn new(db: Box<dyn VectorDatabase>, embedder: Box<dyn Embedder>) -> Self {
+    pub fn new(db: std::sync::Arc<dyn VectorDatabase>, embedder: std::sync::Arc<dyn Embedder>) -> Self {
         Self {
             db,
             embedder,
@@ -171,6 +171,9 @@ impl Archivist {
     }
 
     pub fn start_background_indexer<R: RamMonitor + 'static>(&mut self, monitor: R) -> Result<()> {
+        let db_clone = self.db.clone();
+        let embedder_clone = self.embedder.clone();
+
         let handle = std::thread::spawn(move || {
             // In a real environment, set thread priority: set_low_priority().ok();
 
@@ -195,6 +198,16 @@ impl Archivist {
                 }
 
                 // Normal indexing work here...
+                // Example of wiring logic for Phase 2:
+                // 1. Scan projects for changed files
+                // 2. Chunk files using Archivist::chunk_file
+                // 3. embedder_clone.embed(&texts)
+                // 4. Build IndexedChunk objects
+                // 5. Build tokio runtime or block_on to insert:
+                // tokio::runtime::Handle::current().block_on(async {
+                //     db_clone.insert(&chunks).await.ok();
+                // });
+
                 std::thread::sleep(Duration::from_millis(10)); // normally 300s
             }
         });
@@ -254,7 +267,7 @@ mod tests {
 
     #[test]
     fn test_indexer_suspends_when_ram_is_low() {
-        let mut archivist = Archivist::new(Box::new(LocalMockDatabase), Box::new(LocalMockEmbedder));
+        let mut archivist = Archivist::new(std::sync::Arc::new(LocalMockDatabase), std::sync::Arc::new(LocalMockEmbedder));
         archivist.start_background_indexer(LowRamMonitor).unwrap();
 
         // Wait for thread to complete its limited test iterations
@@ -294,7 +307,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_search_returns_relevant_results() {
-        let archivist = Archivist::new(Box::new(LocalMockDatabase), Box::new(LocalMockEmbedder));
+        let archivist = Archivist::new(std::sync::Arc::new(LocalMockDatabase), std::sync::Arc::new(LocalMockEmbedder));
         let results = archivist.search("query", 5).await.unwrap();
 
         assert!(!results.is_empty());

@@ -12,6 +12,62 @@ pub trait LedgerBackend: Send + Sync {
     fn queue_ambiguous(&self, val: &str);
 }
 
+#[cfg(not(any(test, feature = "mock-backend")))]
+pub struct OsKeyringStore {
+    service_name: String,
+}
+
+#[cfg(not(any(test, feature = "mock-backend")))]
+impl OsKeyringStore {
+    pub fn new(service_name: &str) -> Self {
+        Self {
+            service_name: service_name.to_string(),
+        }
+    }
+}
+
+#[cfg(not(any(test, feature = "mock-backend")))]
+impl KeyringBackend for OsKeyringStore {
+    fn vault_secret(&self, val: &str) -> String {
+        let id = uuid::Uuid::new_v4().to_string();
+        if let Ok(entry) = keyring::Entry::new(&self.service_name, &id) {
+            let _ = entry.set_password(val);
+        }
+        id
+    }
+}
+
+#[cfg(not(any(test, feature = "mock-backend")))]
+pub struct SqliteLedgerStore {
+    conn: std::sync::Mutex<rusqlite::Connection>,
+}
+
+#[cfg(not(any(test, feature = "mock-backend")))]
+impl SqliteLedgerStore {
+    pub fn new(conn: rusqlite::Connection) -> Self {
+        Self {
+            conn: std::sync::Mutex::new(conn),
+        }
+    }
+}
+
+#[cfg(not(any(test, feature = "mock-backend")))]
+impl LedgerBackend for SqliteLedgerStore {
+    fn save_secret(&self, hash: &str, keyring_ref: &str) {
+        let conn = self.conn.lock().unwrap();
+        let id = uuid::Uuid::new_v4().to_string();
+        let now = chrono::Utc::now().to_rfc3339();
+        let _ = conn.execute(
+            "INSERT INTO secrets (id, source_file, classification, key_hash, discovered_at, keyring_ref) VALUES (?1, 'unknown', 'KnownProvider', ?2, ?3, ?4)",
+            (&id, hash, &now, keyring_ref),
+        );
+    }
+
+    fn queue_ambiguous(&self, _val: &str) {
+        tracing::warn!("Queueing ambiguous secret");
+    }
+}
+
 
 pub struct SentinelScanner {
     _noise_patterns: Vec<NoisePattern>,

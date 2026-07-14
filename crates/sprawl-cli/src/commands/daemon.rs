@@ -48,7 +48,7 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                         #[cfg(feature = "real-archivist")]
                         let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
                         #[cfg(not(feature = "real-archivist"))]
-                        let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(Box::new(sprawl_dev::MockDatabase), Box::new(sprawl_dev::MockEmbedder)));
+                        let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
                         
                         match archivist_result {
                             Ok(mut archivist) => {

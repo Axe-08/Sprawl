@@ -13,8 +13,9 @@ impl MockDatabase {
     }
 }
 
+#[async_trait::async_trait]
 impl VectorDatabase for MockDatabase {
-    fn search(
+    async fn search(
         &self,
         _query_embedding: &[f32],
         _top_k: usize,
@@ -27,6 +28,10 @@ impl VectorDatabase for MockDatabase {
             end_line: 3,
             similarity_score: 0.95,
         }])
+    }
+
+    async fn insert(&self, _chunks: &[sprawl_archivist::IndexedChunk]) -> sprawl_archivist::Result<()> {
+        Ok(())
     }
 }
 
