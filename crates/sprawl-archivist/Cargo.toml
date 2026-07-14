@@ -13,11 +13,17 @@ tracing.workspace = true
 tokio.workspace = true
 serde = { workspace = true, optional = true }
 sysinfo = "0.30"
+async-trait = "0.1"
 
 # real-archivist feature deps
 lancedb = { version = "0.10", optional = true }
-ort = { version = "2.0.0-rc.12", features = ["load-dynamic"], optional = true }
-ndarray = { version = "0.15", optional = true }
+arrow = { version = "51.0", optional = true }
+arrow-array = { version = "51.0", optional = true }
+arrow-schema = { version = "51.0", optional = true }
+candle-core = { version = "0.6", optional = true }
+candle-nn = { version = "0.6", optional = true }
+candle-transformers = { version = "0.6", optional = true }
+tokenizers = { version = "0.19", optional = true }
 reqwest = { version = "0.12", features = ["stream"], optional = true }
 
 [dev-dependencies]
@@ -27,4 +33,4 @@ sprawl-dev = { path = "../sprawl-dev" }
 [features]
 default = []
 mock-backend = []
-real-archivist = ["lancedb", "ort", "ndarray", "reqwest", "serde"]
+real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest", "serde"]

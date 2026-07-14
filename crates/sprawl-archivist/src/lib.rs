@@ -66,8 +66,10 @@ impl RamMonitor for SysRamMonitor {
 
 pub const INDEXER_RAM_THRESHOLD_MB: u64 = 1024;
 
+#[async_trait::async_trait]
 pub trait VectorDatabase: Send + Sync {
-    fn search(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<SearchResult>>;
+    async fn search(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<SearchResult>>;
+    async fn insert(&self, chunks: &[IndexedChunk]) -> Result<()>;
 }
 
 pub struct Archivist {
@@ -87,7 +89,7 @@ impl Archivist {
         let model_dir = data_dir.join("models").join("minilm");
         std::fs::create_dir_all(&model_dir)?;
         
-        let embedder = crate::embedding::onnx_embedder::OnnxEmbedder::load(&model_dir).await?;
+        let embedder = crate::embedding::candle_embedder::CandleEmbedder::load(&model_dir).await?;
         
         Ok(Self {
             db: Box::new(db),
@@ -207,7 +209,7 @@ impl Archivist {
         let query_embedding = embeddings.first().cloned().unwrap_or_else(|| vec![0.0; 384]);
 
         // 2. Vector similarity search
-        self.db.search(&query_embedding, top_k)
+        self.db.search(&query_embedding, top_k).await
     }
 }
 
@@ -225,8 +227,9 @@ mod tests {
     }
 
     struct LocalMockDatabase;
+    #[async_trait::async_trait]
     impl VectorDatabase for LocalMockDatabase {
-        fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
+        async fn search(&self, _query_embedding: &[f32], _top_k: usize) -> Result<Vec<SearchResult>> {
             Ok(vec![SearchResult {
                 project_id: "test_proj".into(),
                 file_path: "src/main.rs".into(),
@@ -235,6 +238,10 @@ mod tests {
                 end_line: 3,
                 similarity_score: 0.95,
             }])
+        }
+
+        async fn insert(&self, _chunks: &[IndexedChunk]) -> Result<()> {
+            Ok(())
         }
     }
 
