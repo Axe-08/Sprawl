@@ -60,13 +60,18 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
+            let (size_bytes, idle_days) = get_directory_metadata(&path);
+            let matched_pattern = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+
             let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),
-                matched_pattern: "mock".into(),
-                size_bytes: 0,
-                idle_days: 0,
+                matched_pattern,
+                size_bytes,
+                idle_days,
                 nuke_eligibility: NukeEligibility::Eligible,
                 recommended_action: TriageAction::NukeSafe,
             };
@@ -100,13 +105,18 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
+            let (size_bytes, idle_days) = get_directory_metadata(&path);
+            let matched_pattern = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+
             let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),
-                matched_pattern: "mock".into(),
-                size_bytes: 0,
-                idle_days: 0,
+                matched_pattern,
+                size_bytes,
+                idle_days,
                 nuke_eligibility: NukeEligibility::Eligible,
                 recommended_action: TriageAction::Archive,
             };
@@ -137,13 +147,18 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 std::process::exit(1);
             }
 
+            let (size_bytes, idle_days) = get_directory_metadata(&path);
+            let matched_pattern = path.file_name()
+                .map(|n| n.to_string_lossy().to_string())
+                .unwrap_or_else(|| "Unknown".to_string());
+
             let item = TriageItem {
                 project_id: ProjectId("1".into()),
                 project_root: path.clone(),
                 target_path: path.clone(),
-                matched_pattern: "mock".into(),
-                size_bytes: 0,
-                idle_days: 0,
+                matched_pattern,
+                size_bytes,
+                idle_days,
                 nuke_eligibility: NukeEligibility::Eligible,
                 recommended_action: TriageAction::Snooze,
             };
@@ -161,4 +176,43 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn get_directory_metadata(path: &std::path::Path) -> (u64, i64) {
+    let mut total_size = 0;
+    let mut latest_mtime = std::time::SystemTime::UNIX_EPOCH;
+
+    if path.is_file() {
+        if let Ok(metadata) = path.metadata() {
+            total_size = metadata.len();
+            if let Ok(mtime) = metadata.modified() {
+                latest_mtime = mtime;
+            }
+        }
+    } else if path.is_dir() {
+        for entry in walkdir::WalkDir::new(path).into_iter().filter_map(|e| e.ok()) {
+            if let Ok(metadata) = entry.metadata() {
+                if metadata.is_file() {
+                    total_size += metadata.len();
+                    if let Ok(mtime) = metadata.modified() {
+                        if mtime > latest_mtime {
+                            latest_mtime = mtime;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    let idle_days = if latest_mtime != std::time::SystemTime::UNIX_EPOCH {
+        if let Ok(duration) = std::time::SystemTime::now().duration_since(latest_mtime) {
+            (duration.as_secs() / 86400) as i64
+        } else {
+            0
+        }
+    } else {
+        0
+    };
+
+    (total_size, idle_days)
 }

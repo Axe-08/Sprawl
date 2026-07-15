@@ -123,7 +123,20 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                 }
                 #[cfg(windows)]
                 {
-                    true // mockup for windows for now
+                    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION};
+                    use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+                    
+                    unsafe {
+                        let handle = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, 0, pid);
+                        if handle != 0 && handle != INVALID_HANDLE_VALUE {
+                            let mut exit_code: u32 = 0;
+                            let res = windows_sys::Win32::System::Threading::GetExitCodeProcess(handle, &mut exit_code);
+                            CloseHandle(handle);
+                            res != 0 && exit_code == 259 // 259 is STILL_ACTIVE
+                        } else {
+                            false
+                        }
+                    }
                 }
             } else {
                 false

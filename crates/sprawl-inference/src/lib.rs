@@ -43,7 +43,7 @@ pub struct ModelConfig {
     pub ram_requirement_mb: u64,
 }
 
-#[cfg(any(test, feature = "mock-backend"))]
+#[cfg(not(feature = "real-inference"))]
 pub const DEFAULT_MODEL: ModelConfig = ModelConfig {
     name: "Phi-3 Mini 4K Instruct (Q4_K_M)",
     filename: "Phi-3-mini-4k-instruct-q4_k_m.gguf",
@@ -156,7 +156,7 @@ impl<S: SysInfo> InferenceEngine<S> {
     }
 
     // Mock download mechanism
-    #[cfg(any(test, feature = "mock-backend"))]
+    #[cfg(all(any(test, feature = "mock-backend"), not(feature = "real-inference")))]
     async fn download(
         &self,
         _url: &str,
@@ -209,7 +209,7 @@ impl<S: SysInfo> InferenceEngine<S> {
     }
 
     // Mock sha256
-    #[cfg(any(test, feature = "mock-backend"))]
+    #[cfg(all(any(test, feature = "mock-backend"), not(feature = "real-inference")))]
     fn sha256_file(&self, path: &Path) -> Result<String> {
         let content = std::fs::read_to_string(path)?;
         if content == "mock_gguf_content" {

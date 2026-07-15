@@ -49,10 +49,8 @@ impl EventDeduplicator {
     }
 }
 
-#[allow(dead_code)]
 pub struct FilesystemWatcher {
-    watcher: RecommendedWatcher,
-    _rx: Receiver<std::result::Result<Event, notify::Error>>,
+    _watcher: RecommendedWatcher,
 }
 
 impl FilesystemWatcher {
@@ -80,11 +78,9 @@ impl FilesystemWatcher {
             }
         }
 
-        let (_, dummy_rx) = channel();
         Ok((
             Self {
-                watcher,
-                _rx: dummy_rx,
+                _watcher: watcher,
             },
             rx,
         ))

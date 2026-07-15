@@ -58,14 +58,14 @@ impl Archaeologist {
             let (primary, _all_matches) = self.detect_stack(root).await?;
 
             match primary {
-                Some(_info) => {
+                Some(info) => {
                     tracing::info!("Detected stack for project: {}", root.display());
                     
                     if let Some(conn_mu) = &self.db_conn {
                         let conn = conn_mu.lock().unwrap();
                         let id = uuid::Uuid::new_v4().to_string();
                         let now = chrono::Utc::now().to_rfc3339();
-                        let ecosystem = _info.ecosystem.clone();
+                        let ecosystem = info.ecosystem.clone();
                         let _ = conn.execute(
                             "INSERT INTO projects (id, root_path, ecosystem, last_seen, created_at) VALUES (?1, ?2, ?3, ?4, ?5)
                              ON CONFLICT(root_path) DO UPDATE SET last_seen=excluded.last_seen, ecosystem=excluded.ecosystem",

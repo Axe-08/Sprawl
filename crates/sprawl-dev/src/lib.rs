@@ -56,7 +56,12 @@ pub struct MockLedger;
 
 impl LedgerBackend for MockLedger {
     fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
-    fn queue_ambiguous(&self, _val: &str) {}
+    fn queue_ambiguous(&self, _val: &str, _filepath: &str) {}
+    fn get_ambiguous_secrets(&self) -> Vec<sprawl_sentinel::llm::DiscoveredSecret> {
+        vec![]
+    }
+    fn mark_accepted(&self, _id: uuid::Uuid) {}
+    fn mark_rejected(&self, _id: uuid::Uuid) {}
 }
 
 pub struct HighRamMock;

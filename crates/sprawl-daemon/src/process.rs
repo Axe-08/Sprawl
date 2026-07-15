@@ -62,8 +62,22 @@ impl DaemonContext {
         }
         #[cfg(windows)]
         {
-            tracing::info!("Sent stop signal to daemon PID {}", _pid);
-            // Implement Windows Process Terminate here
+            use windows_sys::Win32::System::Threading::{OpenProcess, TerminateProcess, PROCESS_TERMINATE};
+            use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
+            
+            unsafe {
+                let handle = OpenProcess(PROCESS_TERMINATE, 0, _pid);
+                if handle != 0 && handle != INVALID_HANDLE_VALUE {
+                    let res = TerminateProcess(handle, 1);
+                    CloseHandle(handle);
+                    if res == 0 {
+                        return Err(sprawl_core::SprawlError::Other("Failed to terminate Windows process".into()));
+                    }
+                    tracing::info!("Terminated Windows daemon PID {}", _pid);
+                } else {
+                    return Err(sprawl_core::SprawlError::Other("Could not open Windows process for termination".into()));
+                }
+            }
         }
 
         Ok(())
