@@ -14,18 +14,20 @@ uuid = { workspace = true, features = ["v4", "fast-rng"] }
 tracing.workspace = true
 tokio.workspace = true
 serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
 sysinfo = "0.30"
 async-trait = "0.1"
 
 # real-archivist feature deps
-lancedb = { version = "0.10", optional = true }
-arrow = { version = "51.0", optional = true }
-arrow-array = { version = "51.0", optional = true }
-arrow-schema = { version = "51.0", optional = true }
-candle-core = { version = "0.6", optional = true }
-candle-nn = { version = "0.6", optional = true }
-candle-transformers = { version = "0.6", optional = true }
-tokenizers = { version = "0.19", optional = true }
+lancedb = { version = "0.31", optional = true }
+arrow = { version = "58.3", optional = true }
+arrow-array = { version = "58.3", optional = true }
+arrow-schema = { version = "58.3", optional = true }
+futures = { version = "0.3", optional = true }
+candle-core = { version = "0.11", optional = true }
+candle-nn = { version = "0.11", optional = true }
+candle-transformers = { version = "0.11", optional = true }
+tokenizers = { version = "0.23", optional = true }
 reqwest = { version = "0.12", features = ["stream"], optional = true }
 
 [dev-dependencies]
@@ -35,4 +37,4 @@ sprawl-dev = { path = "../sprawl-dev" }
 [features]
 default = []
 mock-backend = []
-real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest"]
+real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "futures", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest"]

@@ -47,6 +47,7 @@ pub mod candle_embedder {
                 let pad_params = tokenizers::PaddingParams {
                     strategy: tokenizers::PaddingStrategy::BatchLongest,
                     direction: tokenizers::PaddingDirection::Right,
+                    pad_to_multiple_of: None,
                     pad_id: 0,
                     pad_type_id: 0,
                     pad_token: String::from("[PAD]"),
@@ -77,7 +78,7 @@ pub mod candle_embedder {
 
     impl Embedder for CandleEmbedder {
         fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
-            let mut tokenizer = self.tokenizer.lock().unwrap();
+            let tokenizer = self.tokenizer.lock().unwrap();
             let model = self.model.lock().unwrap();
 
             let tokens = tokenizer.encode_batch(texts.to_vec(), true)
@@ -88,7 +89,7 @@ pub mod candle_embedder {
             let n_sentences = token_ids.len();
             let n_tokens = token_ids[0].len();
             
-            let mut flat_ids = Vec::with_capacity(n_sentences * n_tokens);
+            let mut flat_ids: Vec<u32> = Vec::with_capacity(n_sentences * n_tokens);
             for ids in &token_ids {
                 flat_ids.extend(ids);
             }

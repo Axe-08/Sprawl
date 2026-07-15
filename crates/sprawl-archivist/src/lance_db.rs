@@ -1,22 +1,25 @@
 #[cfg(feature = "real-archivist")]
 pub mod lancedb_backend {
-    use sprawl_archivist::{IndexedChunk, SearchResult, VectorDatabase};
-    use sprawl_core::Result;
-    use lancedb::{Connection, Table};
+    use crate::{IndexedChunk, SearchResult, VectorDatabase, Result, ArchivistError};
+    use lancedb::{connect, Table};
+    use lancedb::query::{ExecutableQuery, QueryBase};
+    use lancedb::index::Index;
     use std::sync::Arc;
     use arrow_schema::{Schema, Field, DataType};
-    use arrow_array::{RecordBatch, StringArray, Float32Array, UInt32Array, FixedSizeListArray, cast::AsArray, types::Float32Type};
-    // We will need futures for stream next
-    use futures_util::StreamExt;
+    use arrow_array::{
+        RecordBatch, StringArray, UInt32Array, FixedSizeListArray,
+        cast::AsArray, types::Float32Type,
+    };
+    use futures::TryStreamExt;
 
     pub struct LanceVectorDb {
-        table: Arc<Table>,
+        table: Table,
     }
 
     impl LanceVectorDb {
         pub async fn connect(path: &str) -> Result<Self> {
-            let conn = lancedb::connect(path).execute().await
-                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            let conn = connect(path).execute().await
+                .map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             let schema = Arc::new(Schema::new(vec![
                 Field::new("id", DataType::Utf8, false),
@@ -26,8 +29,7 @@ pub mod lancedb_backend {
                 Field::new("start_line", DataType::UInt32, false),
                 Field::new("end_line", DataType::UInt32, false),
                 Field::new(
-                    "item", // lancedb requires the vector column to be named 'vector' usually, but 'item' is used in schema? 
-                    // Actually lancedb default is 'vector' or you can specify it. Let's use 'vector'
+                    "vector",
                     DataType::FixedSizeList(
                         Arc::new(Field::new("item", DataType::Float32, true)),
                         384,
@@ -37,42 +39,57 @@ pub mod lancedb_backend {
             ]));
 
             let table_names = conn.table_names().execute().await
-                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                .map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             let table = if table_names.contains(&"sprawl_chunks".to_string()) {
                 conn.open_table("sprawl_chunks").execute().await
-                    .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                    .map_err(|e| ArchivistError::Database(e.to_string()))?
             } else {
-                conn.create_empty_table("sprawl_chunks", schema).execute().await
-                    .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                let tbl = conn.create_empty_table("sprawl_chunks", schema).execute().await
+                    .map_err(|e| ArchivistError::Database(e.to_string()))?;
+                // Best-effort: create ANN index (no-op on empty table, won't fail)
+                let _ = tbl.create_index(&["vector"], Index::Auto).execute().await;
+                tbl
             };
 
-            Ok(Self {
-                table: Arc::new(table),
-            })
+            Ok(Self { table })
         }
     }
 
     #[async_trait::async_trait]
     impl VectorDatabase for LanceVectorDb {
-        async fn search(&self, query_embedding: &[f32], top_k: usize) -> sprawl_core::Result<Vec<SearchResult>> {
-            let query_vec = lancedb::query::Query::new(self.table.clone())
-                .column("vector")
+        async fn search(&self, query_embedding: &[f32], top_k: usize) -> Result<Vec<SearchResult>> {
+            let mut stream = self.table
+                .query()
+                .nearest_to(query_embedding)
+                .map_err(|e| ArchivistError::Database(format!("ANN query build failed: {e}")))?
                 .limit(top_k)
                 .execute()
                 .await
-                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                .map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             let mut results = Vec::new();
-            let mut stream = query_vec;
-            while let Some(batch) = stream.next().await {
-                let batch = batch.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
-                let project_id_col = batch.column_by_name("project_id").unwrap().as_string::<i32>();
-                let file_path_col = batch.column_by_name("file_path").unwrap().as_string::<i32>();
-                let chunk_text_col = batch.column_by_name("chunk_text").unwrap().as_string::<i32>();
-                let start_line_col = batch.column_by_name("start_line").unwrap().as_primitive::<arrow_array::types::UInt32Type>();
-                let end_line_col = batch.column_by_name("end_line").unwrap().as_primitive::<arrow_array::types::UInt32Type>();
-                let distance_col = batch.column_by_name("_distance").unwrap().as_primitive::<arrow_array::types::Float32Type>();
+            while let Some(batch) = stream.try_next().await
+                .map_err(|e| ArchivistError::Database(e.to_string()))?
+            {
+                let project_id_col = batch.column_by_name("project_id")
+                    .ok_or_else(|| ArchivistError::Database("missing column: project_id".into()))?
+                    .as_string::<i32>();
+                let file_path_col = batch.column_by_name("file_path")
+                    .ok_or_else(|| ArchivistError::Database("missing column: file_path".into()))?
+                    .as_string::<i32>();
+                let chunk_text_col = batch.column_by_name("chunk_text")
+                    .ok_or_else(|| ArchivistError::Database("missing column: chunk_text".into()))?
+                    .as_string::<i32>();
+                let start_line_col = batch.column_by_name("start_line")
+                    .ok_or_else(|| ArchivistError::Database("missing column: start_line".into()))?
+                    .as_primitive::<arrow_array::types::UInt32Type>();
+                let end_line_col = batch.column_by_name("end_line")
+                    .ok_or_else(|| ArchivistError::Database("missing column: end_line".into()))?
+                    .as_primitive::<arrow_array::types::UInt32Type>();
+                let distance_col = batch.column_by_name("_distance")
+                    .ok_or_else(|| ArchivistError::Database("missing column: _distance".into()))?
+                    .as_primitive::<arrow_array::types::Float32Type>();
 
                 for i in 0..batch.num_rows() {
                     results.push(SearchResult {
@@ -81,7 +98,8 @@ pub mod lancedb_backend {
                         chunk_text: chunk_text_col.value(i).to_string(),
                         start_line: start_line_col.value(i),
                         end_line: end_line_col.value(i),
-                        similarity_score: 1.0 - distance_col.value(i), // Approx similarity
+                        // L2 distance: convert to similarity score in [0, 1]
+                        similarity_score: 1.0 / (1.0 + distance_col.value(i)),
                     });
                 }
             }
@@ -89,7 +107,7 @@ pub mod lancedb_backend {
             Ok(results)
         }
 
-        async fn insert(&self, chunks: &[IndexedChunk]) -> sprawl_core::Result<()> {
+        async fn insert(&self, chunks: &[IndexedChunk]) -> Result<()> {
             if chunks.is_empty() {
                 return Ok(());
             }
@@ -100,7 +118,7 @@ pub mod lancedb_backend {
             let chunk_texts: Vec<Option<&str>> = chunks.iter().map(|c| Some(c.chunk_text.as_str())).collect();
             let start_lines: Vec<Option<u32>> = chunks.iter().map(|c| Some(c.chunk_start_line)).collect();
             let end_lines: Vec<Option<u32>> = chunks.iter().map(|c| Some(c.chunk_end_line)).collect();
-            
+
             let id_array = StringArray::from(ids);
             let project_id_array = StringArray::from(project_ids);
             let file_path_array = StringArray::from(file_paths);
@@ -108,26 +126,21 @@ pub mod lancedb_backend {
             let start_line_array = UInt32Array::from(start_lines);
             let end_line_array = UInt32Array::from(end_lines);
 
-            let mut all_embeddings = Vec::with_capacity(chunks.len() * 384);
-            for c in chunks {
-                let mut emb = c.embedding.clone();
-                if emb.len() != 384 {
+            // Build a flat f32 buffer with all embeddings, each padded/truncated to 384 dims
+            let vector_array = FixedSizeListArray::from_iter_primitive::<Float32Type, _, _>(
+                chunks.iter().map(|c| {
+                    let mut emb = c.embedding.clone();
                     emb.resize(384, 0.0);
-                }
-                all_embeddings.extend(emb);
-            }
-            
-            let emb_array = Float32Array::from(all_embeddings);
-            let field = Arc::new(Field::new("item", DataType::Float32, true));
-            let fixed_size_list = FixedSizeListArray::try_new(
-                field,
+                    Some(emb.into_iter().map(Some))
+                }),
                 384,
-                Arc::new(emb_array),
-                None,
-            ).map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            );
+
+            let schema = self.table.schema().await
+                .map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             let batch = RecordBatch::try_new(
-                self.table.schema().await.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?,
+                Arc::new(schema.as_ref().clone()),
                 vec![
                     Arc::new(id_array),
                     Arc::new(project_id_array),
@@ -135,12 +148,12 @@ pub mod lancedb_backend {
                     Arc::new(chunk_text_array),
                     Arc::new(start_line_array),
                     Arc::new(end_line_array),
-                    Arc::new(fixed_size_list),
+                    Arc::new(vector_array),
                 ],
-            ).map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            ).map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             self.table.add(vec![batch]).execute().await
-                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                .map_err(|e| ArchivistError::Database(e.to_string()))?;
 
             Ok(())
         }
