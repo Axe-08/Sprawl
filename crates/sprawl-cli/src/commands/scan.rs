@@ -25,8 +25,25 @@ struct Finding {
 }
 
 pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
-    // In M18 we use a simple mock traversal to satisfy integration tests.
-    let scanner = SentinelScanner::new(vec![], Box::new(sprawl_dev::MockKeyringStore), Box::new(sprawl_dev::MockLedger));
+    let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
+    let ledger_path = sprawl_core::platform::sprawl_data_dir()?.join("ledger.sqlite");
+    let conn = rusqlite::Connection::open(&ledger_path)
+        .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to open ledger: {}", e)))?;
+    
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS secrets (
+            id TEXT PRIMARY KEY,
+            source_file TEXT NOT NULL,
+            classification TEXT NOT NULL,
+            key_hash TEXT NOT NULL,
+            discovered_at TEXT NOT NULL,
+            keyring_ref TEXT NOT NULL
+        )",
+        []
+    );
+    let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
+
+    let scanner = SentinelScanner::new(vec![], keyring, ledger);
     
     let use_json = is_json || args.json;
 

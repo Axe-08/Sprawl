@@ -35,7 +35,7 @@ pub async fn run_daemon_loop(
                 match listener.accept().await {
                     Ok((mut socket, _addr)) => {
                         let archivist_clone = archivist.clone();
-                        let sentinel_clone = sentinel.clone();
+                        let _sentinel_clone = sentinel.clone();
                         tokio::spawn(async move {
                             use tokio::io::{AsyncReadExt, AsyncWriteExt};
                             let mut buf = vec![0; 1024 * 1024]; // 1MB buffer
@@ -79,32 +79,40 @@ pub async fn run_daemon_loop(
         }
     });
 
-    // 2. Setup Filesystem Watcher (normally we'd read project roots from the Ledger first)
     let project_roots: Vec<std::path::PathBuf> = {
-        let conn = rusqlite::Connection::open(&ledger_path)
-            .map_err(|e| sprawl_core::SprawlError::Other(format!("Ledger open failed: {}", e)))?;
-        let mut stmt = conn.prepare(
-            "SELECT root_path FROM projects WHERE status IN ('active', 'idle')"
-        ).unwrap_or_else(|_| {
-            let _ = conn.execute(
-                "CREATE TABLE IF NOT EXISTS projects (
-                    id TEXT PRIMARY KEY,
-                    root_path TEXT UNIQUE NOT NULL,
-                    status TEXT NOT NULL
-                )",
-                []
-            );
-            conn.prepare("SELECT root_path FROM projects WHERE status IN ('active', 'idle')").unwrap()
-        });
-        stmt.query_map([], |row| row.get::<_, String>(0))
-            .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
-            .filter_map(|r| r.ok())
-            .map(std::path::PathBuf::from)
-            .collect()
+        let mut results = Vec::new();
+        if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+            if let Ok(mut stmt) = conn.prepare("SELECT root_path FROM projects WHERE status IN ('active', 'idle')") {
+                if let Ok(rows) = stmt.query_map([], |row| row.get::<_, String>(0)) {
+                    for r in rows {
+                        if let Ok(path) = r {
+                            results.push(std::path::PathBuf::from(path));
+                        }
+                    }
+                }
+            } else {
+                let _ = conn.execute(
+                    "CREATE TABLE IF NOT EXISTS projects (
+                        id TEXT PRIMARY KEY,
+                        root_path TEXT UNIQUE NOT NULL,
+                        status TEXT NOT NULL
+                    )",
+                    []
+                );
+            }
+        }
+        results
     };
     tracing::info!("Watching {} project roots", project_roots.len());
     let config_paths = vec![];
     let (_watcher, rx) = FilesystemWatcher::new(&project_roots, &config_paths)?;
+
+    let (event_tx, mut event_rx) = tokio::sync::mpsc::unbounded_channel();
+    tokio::task::spawn_blocking(move || {
+        while let Ok(event) = rx.recv() {
+            let _ = event_tx.send(event);
+        }
+    });
 
     let mut dedup = EventDeduplicator::new();
 
@@ -112,8 +120,8 @@ pub async fn run_daemon_loop(
     loop {
         tokio::select! {
             // Filesystem events
-            Ok(e) = tokio::task::spawn_blocking(move || rx.recv()) => {
-                if let Ok(Ok(event)) = e {
+            Some(e) = event_rx.recv() => {
+                if let Ok(event) = e {
                     dedup.ingest(event);
                 }
             }
