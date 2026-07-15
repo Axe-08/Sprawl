@@ -4,18 +4,17 @@ use sprawl_core::Result;
 #[derive(Args)]
 pub struct StatusArgs {}
 
-pub fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
+pub async fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
     let mut daemon_running = false;
     let mut daemon_pid = None;
 
-    let rt = tokio::runtime::Runtime::new()?;
-    let ping_result = rt.block_on(async {
+    let ping_result = {
         if let Ok(client) = sprawl_daemon::IpcClient::new() {
             client.send_request(&sprawl_daemon::IpcRequest::Ping).await.ok()
         } else {
             None
         }
-    });
+    };
 
     let mut uptime = 0;
     match ping_result {

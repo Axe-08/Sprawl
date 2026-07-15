@@ -80,12 +80,12 @@ async fn main() {
         Command::Scan(args) => commands::scan::handle(args, cli.json),
         Command::Search(args) => commands::search::handle(args, cli.json).await,
         Command::Triage(args) => commands::triage::handle(args, cli.json),
-        Command::Status(args) => commands::status::handle(args, cli.json),
+        Command::Status(args) => commands::status::handle(args, cli.json).await,
         Command::Index(args) => commands::index::handle(args, cli.json).await,
         Command::Resurrect(args) => commands::resurrect::handle(args, cli.json),
         Command::ProfileMachine(args) => commands::profile_machine::handle(args, cli.json),
         Command::Ui => {
-            if let Err(e) = sprawl_tui::run() {
+            if let Err(e) = sprawl_tui::run().await {
                 Err(sprawl_core::SprawlError::Other(format!("TUI Error: {}", e)))
             } else {
                 Ok(())

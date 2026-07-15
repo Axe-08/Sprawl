@@ -108,7 +108,10 @@ pub async fn run_daemon_loop(
                     "CREATE TABLE IF NOT EXISTS projects (
                         id TEXT PRIMARY KEY,
                         root_path TEXT UNIQUE NOT NULL,
-                        status TEXT NOT NULL
+                        ecosystem TEXT,
+                        status TEXT NOT NULL DEFAULT 'active',
+                        last_seen TEXT,
+                        created_at TEXT
                     )",
                     []
                 );

@@ -14,9 +14,8 @@ use std::io;
 
 use crate::app::{App, AppEvent};
 
-pub fn run() -> io::Result<()> {
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(run_async())
+pub async fn run() -> io::Result<()> {
+    run_async().await
 }
 
 async fn run_async() -> io::Result<()> {
