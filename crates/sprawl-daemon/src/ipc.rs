@@ -5,6 +5,7 @@ use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcRequest {
+    Ping,
     Search { query: String, top_k: usize },
     GetSentinelInbox,
     SentinelAccept { id: uuid::Uuid },
@@ -13,6 +14,7 @@ pub enum IpcRequest {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcResponse {
+    Pong { pid: u32, uptime_secs: u64 },
     SearchResults(Vec<sprawl_archivist::SearchResult>),
     SentinelInbox(Vec<sprawl_sentinel::llm::DiscoveredSecret>),
     Ok,

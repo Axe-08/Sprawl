@@ -9,6 +9,8 @@ repository.workspace = true
 sprawl-core = { path = "../sprawl-core" }
 anyhow.workspace = true
 thiserror.workspace = true
+chrono.workspace = true
+uuid = { workspace = true, features = ["v4", "fast-rng"] }
 tracing.workspace = true
 tokio.workspace = true
 serde = { workspace = true, features = ["derive"] }

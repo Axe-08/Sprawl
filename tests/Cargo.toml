@@ -79,3 +79,4 @@ path = "integration/sqlite_ledger_test.rs"
 
 [features]
 real-archivist = ["sprawl-archivist/real-archivist"]
+real-inference = ["sprawl-inference/real-inference"]

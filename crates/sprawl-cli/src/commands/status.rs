@@ -1,6 +1,5 @@
 use clap::Args;
 use sprawl_core::Result;
-use std::os::unix::net::UnixStream;
 
 #[derive(Args)]
 pub struct StatusArgs {}
@@ -9,29 +8,26 @@ pub fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
     let mut daemon_running = false;
     let mut daemon_pid = None;
 
-    // Check daemon status via IPC
-    // (We recreate the logic from daemon.rs status check here for completeness)
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    let socket_path = std::path::PathBuf::from(home).join(".sprawl").join("sprawl.sock");
-    
-    if socket_path.exists() {
-        if let Ok(_) = UnixStream::connect(&socket_path) {
+    let rt = tokio::runtime::Runtime::new()?;
+    let ping_result = rt.block_on(async {
+        if let Ok(client) = sprawl_daemon::IpcClient::new() {
+            client.send_request(&sprawl_daemon::IpcRequest::Ping).await.ok()
+        } else {
+            None
+        }
+    });
+
+    let mut uptime = 0;
+    match ping_result {
+        Some(sprawl_daemon::IpcResponse::Pong { pid, uptime_secs }) => {
             daemon_running = true;
-            // TODO: In a real implementation we'd send a Ping and get the PID back.
-            // For now we'll just say we don't know the PID if we just connect.
-            
-            // Try to read pid file as a fallback
-            let pid_path = std::path::PathBuf::from(std::env::var("HOME").unwrap_or_else(|_| ".".into()))
-                .join(".sprawl")
-                .join("sprawl.pid");
-            if let Ok(pid_str) = std::fs::read_to_string(&pid_path) {
-                if let Ok(pid) = pid_str.trim().parse::<u32>() {
-                    daemon_pid = Some(pid);
-                }
-            }
+            daemon_pid = Some(pid);
+            uptime = uptime_secs;
+        }
+        _ => {
+            daemon_running = false;
         }
     }
-
     // Determine backend features at compile time
     let archivist_backend = if cfg!(feature = "real-archivist") {
         "real"
@@ -58,7 +54,8 @@ pub fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
             serde_json::json!({
                 "daemon": {
                     "running": daemon_running,
-                    "pid": daemon_pid
+                    "pid": daemon_pid,
+                    "uptime_secs": uptime
                 },
                 "sentinel_unreviewed": sentinel_unreviewed,
                 "sweeper_nuke_eligible": sweeper_nuke_eligible,
@@ -71,7 +68,7 @@ pub fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
         
         if daemon_running {
             if let Some(pid) = daemon_pid {
-                println!("  Daemon:           Running (PID {})", pid);
+                println!("  Daemon:           Running (PID {}, Uptime: {}s)", pid, uptime);
             } else {
                 println!("  Daemon:           Running");
             }

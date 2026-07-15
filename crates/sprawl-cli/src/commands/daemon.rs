@@ -68,7 +68,8 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                     let sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
                     let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(&sentinel_data_dir).unwrap());
 
-                    if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel).await {
+                    let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
+                    if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel, ledger_path).await {
                         tracing::error!("Daemon loop failed: {}", e);
                     }
                 });

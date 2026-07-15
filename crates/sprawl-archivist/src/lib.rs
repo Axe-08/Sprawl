@@ -225,6 +225,35 @@ impl Archivist {
         // 2. Vector similarity search
         self.db.search(&query_embedding, top_k).await
     }
+
+    pub async fn index_file(&self, path: &Path) -> Result<()> {
+        let chunks = Self::chunk_file(path)?;
+        if chunks.is_empty() {
+            return Ok(());
+        }
+
+        let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();
+        let embeddings = self.embedder.embed(&texts)?;
+
+        let mut indexed_chunks = Vec::new();
+        let now = chrono::Utc::now().to_rfc3339();
+        
+        for (i, chunk) in chunks.into_iter().enumerate() {
+            let embedding = embeddings.get(i).cloned().unwrap_or_else(|| vec![0.0; 384]);
+            indexed_chunks.push(IndexedChunk {
+                id: uuid::Uuid::new_v4().to_string(),
+                project_id: "unknown".to_string(), // In a real implementation we'd look this up
+                file_path: path.to_string_lossy().to_string(),
+                chunk_text: chunk.text,
+                chunk_start_line: chunk.start_line,
+                chunk_end_line: chunk.end_line,
+                embedding,
+                indexed_at: now.clone(),
+            });
+        }
+
+        self.db.insert(&indexed_chunks).await
+    }
 }
 
 #[cfg(test)]

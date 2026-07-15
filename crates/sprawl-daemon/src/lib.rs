@@ -12,7 +12,8 @@ use std::sync::Arc;
 /// Main entry loop for the daemon.
 pub async fn run_daemon_loop(
     archivist: Arc<sprawl_archivist::Archivist>,
-    sentinel: Arc<sprawl_sentinel::scanner::SentinelScanner>
+    sentinel: Arc<sprawl_sentinel::scanner::SentinelScanner>,
+    ledger_path: std::path::PathBuf,
 ) -> Result<()> {
     tracing::info!("Daemon entering main run loop");
 
@@ -21,6 +22,8 @@ pub async fn run_daemon_loop(
     
     #[cfg(unix)]
     let listener = ipc.bind().await?;
+
+    let start_time = std::time::Instant::now();
 
     // Spawn IPC listener in background
     #[cfg(unix)]
@@ -40,6 +43,12 @@ pub async fn run_daemon_loop(
                                 let req_str = String::from_utf8_lossy(&buf[..n]);
                                 if let Ok(req) = serde_json::from_str::<IpcRequest>(&req_str) {
                                     let resp = match req {
+                                        IpcRequest::Ping => {
+                                            IpcResponse::Pong {
+                                                pid: std::process::id(),
+                                                uptime_secs: start_time.elapsed().as_secs(),
+                                            }
+                                        }
                                         IpcRequest::Search { query, top_k } => {
                                             match archivist_clone.search(&query, top_k).await {
                                                 Ok(results) => IpcResponse::SearchResults(results),
@@ -71,7 +80,29 @@ pub async fn run_daemon_loop(
     });
 
     // 2. Setup Filesystem Watcher (normally we'd read project roots from the Ledger first)
-    let project_roots = vec![];
+    let project_roots: Vec<std::path::PathBuf> = {
+        let conn = rusqlite::Connection::open(&ledger_path)
+            .map_err(|e| sprawl_core::SprawlError::Other(format!("Ledger open failed: {}", e)))?;
+        let mut stmt = conn.prepare(
+            "SELECT root_path FROM projects WHERE status IN ('active', 'idle')"
+        ).unwrap_or_else(|_| {
+            let _ = conn.execute(
+                "CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    root_path TEXT UNIQUE NOT NULL,
+                    status TEXT NOT NULL
+                )",
+                []
+            );
+            conn.prepare("SELECT root_path FROM projects WHERE status IN ('active', 'idle')").unwrap()
+        });
+        stmt.query_map([], |row| row.get::<_, String>(0))
+            .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+            .filter_map(|r| r.ok())
+            .map(std::path::PathBuf::from)
+            .collect()
+    };
+    tracing::info!("Watching {} project roots", project_roots.len());
     let config_paths = vec![];
     let (_watcher, rx) = FilesystemWatcher::new(&project_roots, &config_paths)?;
 
@@ -82,7 +113,7 @@ pub async fn run_daemon_loop(
         tokio::select! {
             // Filesystem events
             Ok(e) = tokio::task::spawn_blocking(move || rx.recv()) => {
-                if let Ok(event) = e {
+                if let Ok(Ok(event)) = e {
                     dedup.ingest(event);
                 }
             }
@@ -90,9 +121,20 @@ pub async fn run_daemon_loop(
             _ = tokio::time::sleep(std::time::Duration::from_millis(500)) => {
                 // Flush deduplicator
                 if let Some(batches) = dedup.flush_if_ready() {
-                    for (root, events) in batches {
-                        tracing::info!("Processing {} events for project root: {}", events.len(), root.display());
-                        // Dispatch to Event Router
+                    for (_root, events) in batches {
+                        for event in events {
+                            if let notify::EventKind::Create(_) | notify::EventKind::Modify(_) = event.kind {
+                                for path in &event.paths {
+                                    let archivist_clone = archivist.clone();
+                                    let path_clone = path.clone();
+                                    tokio::spawn(async move {
+                                        if let Err(e) = archivist_clone.index_file(&path_clone).await {
+                                            tracing::warn!("Index failed for {}: {}", path_clone.display(), e);
+                                        }
+                                    });
+                                }
+                            }
+                        }
                     }
                 }
             }

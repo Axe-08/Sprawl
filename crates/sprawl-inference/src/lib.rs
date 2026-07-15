@@ -5,9 +5,9 @@
 //!
 //! - **`inference`**: Compiles in the real Candle GGUF model loader and Phi-3 generation loop.
 //!   Requires a 2.4GB model file at `~/.sprawl/models/`. Enable with
-//!   `cargo build --features inference`. Disabled by default for fast dev builds.
+//!   `cargo build --features real-inference`. Disabled by default for fast dev builds.
 //!
-//! These are independent: `mock-backend` has priority in tests; `inference` is for the
+//! These are independent: `mock-backend` has priority in tests; `real-inference` is for the
 //! production binary only.
 
 use sprawl_core::platform::sprawl_data_dir;
@@ -54,7 +54,7 @@ pub const DEFAULT_MODEL: ModelConfig = ModelConfig {
     ram_requirement_mb: 3072,
 };
 
-#[cfg(not(any(test, feature = "mock-backend")))]
+#[cfg(feature = "real-inference")]
 pub const DEFAULT_MODEL: ModelConfig = ModelConfig {
     name: "Phi-3 Mini 4K Instruct (Q4)",
     filename: "Phi-3-mini-4k-instruct-q4.gguf",
@@ -112,11 +112,15 @@ impl SysInfo for RealSysInfo {
     }
 }
 
+#[cfg(feature = "real-inference")]
 pub struct LoadedModel {
     pub weights: candle_transformers::models::quantized_llama::ModelWeights,
     pub tokenizer: tokenizers::Tokenizer,
     pub device: candle_core::Device,
 }
+
+#[cfg(not(feature = "real-inference"))]
+pub struct LoadedModel {}
 
 pub struct InferenceEngine<S: SysInfo> {
     pub config: ModelConfig,
@@ -162,7 +166,7 @@ impl<S: SysInfo> InferenceEngine<S> {
         std::fs::write(path, "mock_gguf_content").map_err(InferenceError::Io)
     }
 
-    #[cfg(not(any(test, feature = "mock-backend")))]
+    #[cfg(feature = "real-inference")]
     async fn download(
         &self,
         url: &str,
@@ -217,7 +221,22 @@ impl<S: SysInfo> InferenceEngine<S> {
         }
     }
 
-    #[cfg(not(any(test, feature = "mock-backend")))]
+    #[cfg(not(any(test, feature = "mock-backend", feature = "real-inference")))]
+    async fn download(
+        &self,
+        _url: &str,
+        _path: &Path,
+        _tx: &Option<Sender<EngineProgress>>,
+    ) -> Result<()> {
+        Err(InferenceError::Other("Inference backend not compiled".into()))
+    }
+
+    #[cfg(not(any(test, feature = "mock-backend", feature = "real-inference")))]
+    fn sha256_file(&self, _path: &Path) -> Result<String> {
+        Err(InferenceError::Other("Inference backend not compiled".into()))
+    }
+
+    #[cfg(feature = "real-inference")]
     fn sha256_file(&self, path: &Path) -> Result<String> {
         use sha2::{Digest, Sha256};
         let mut file = std::fs::File::open(path)?;
@@ -286,16 +305,24 @@ impl<S: SysInfo> InferenceEngine<S> {
             }
         }
 
-        let mut file = std::fs::File::open(path)?;
-        let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)
-            .map_err(|e| InferenceError::Other(e.to_string()))?;
-        let device = candle_core::Device::Cpu;
-        let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
-            .map_err(|e| InferenceError::Other(e.to_string()))?;
-        let tokenizer_path = path.with_file_name("tokenizer.json");
-        let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
-            .map_err(|e| InferenceError::Other(e.to_string()))?;
-        self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
+        #[cfg(feature = "real-inference")]
+        {
+            let mut file = std::fs::File::open(path)?;
+            let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            let device = candle_core::Device::Cpu;
+            let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            let tokenizer_path = path.with_file_name("tokenizer.json");
+            let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
+        }
+        
+        #[cfg(not(feature = "real-inference"))]
+        {
+            self.loaded_model = Some(LoadedModel {});
+        }
 
         self.state = InferenceStatus::Ready;
         Ok(())
@@ -317,7 +344,10 @@ impl<S: SysInfo> InferenceEngine<S> {
             "mock classification: likely_noise".to_string()
         };
 
-        #[cfg(not(any(test, feature = "mock-backend")))]
+        #[cfg(not(any(test, feature = "mock-backend", feature = "real-inference")))]
+        let response = "ERROR: Inference backend not compiled. Build with --features real-inference.".to_string();
+
+        #[cfg(feature = "real-inference")]
         let response = {
             use candle_transformers::generation::LogitsProcessor;
             use candle_core::Tensor;

@@ -35,5 +35,5 @@ hex = "0.4.3"
 default = []
 mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend"]
 debug = ["mock-backend"]
-real-inference = []
+real-inference = ["sprawl-inference/real-inference"]
 real-archivist = ["sprawl-archivist/real-archivist"]
