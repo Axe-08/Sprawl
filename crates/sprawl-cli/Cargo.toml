@@ -8,6 +8,7 @@ repository.workspace = true
 [dependencies]
 clap = { version = "4.4", features = ["derive"] }
 uuid = { version = "1.8", features = ["v4"] }
+rusqlite = "0.31.0"
 sprawl-sentinel = { path = "../sprawl-sentinel" }
 sprawl-archaeologist = { version = "0.1.0", path = "../sprawl-archaeologist" }
 sprawl-inference = { version = "0.1.0", path = "../sprawl-inference" }

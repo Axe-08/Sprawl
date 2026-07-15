@@ -66,7 +66,23 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                     let archivist = std::sync::Arc::new(archivist);
 
                     let sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
-                    let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(&sentinel_data_dir).unwrap());
+                    let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
+                    let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
+                    let conn = rusqlite::Connection::open(&ledger_path).expect("Failed to open ledger");
+                    let _ = conn.execute(
+                        "CREATE TABLE IF NOT EXISTS secrets (
+                            id TEXT PRIMARY KEY,
+                            source_file TEXT NOT NULL,
+                            classification TEXT NOT NULL,
+                            key_hash TEXT NOT NULL,
+                            discovered_at TEXT NOT NULL,
+                            keyring_ref TEXT NOT NULL
+                        )",
+                        []
+                    );
+                    let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
+                    
+                    let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(vec![], keyring, ledger));
 
                     let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
                     if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel, ledger_path).await {

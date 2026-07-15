@@ -9,7 +9,10 @@ pub trait KeyringBackend: Send + Sync {
 
 pub trait LedgerBackend: Send + Sync {
     fn save_secret(&self, hash: &str, keyring_ref: &str);
-    fn queue_ambiguous(&self, val: &str);
+    fn queue_ambiguous(&self, val: &str, filepath: &str);
+    fn get_ambiguous_secrets(&self) -> Vec<crate::llm::DiscoveredSecret>;
+    fn mark_accepted(&self, id: uuid::Uuid);
+    fn mark_rejected(&self, id: uuid::Uuid);
 }
 
 pub struct OsKeyringStore {
@@ -57,8 +60,36 @@ impl LedgerBackend for SqliteLedgerStore {
         );
     }
 
-    fn queue_ambiguous(&self, _val: &str) {
-        tracing::warn!("Queueing ambiguous secret");
+    fn queue_ambiguous(&self, val: &str, filepath: &str) {
+        let conn = self.conn.lock().unwrap();
+        let id = uuid::Uuid::new_v4().to_string();
+        let _ = conn.execute(
+            "INSERT OR IGNORE INTO ambiguous_secrets (id, raw_value, filepath, status) VALUES (?1, ?2, ?3, 'pending')",
+            (&id, val, filepath),
+        );
+    }
+
+    fn get_ambiguous_secrets(&self) -> Vec<crate::llm::DiscoveredSecret> {
+        let conn = self.conn.lock().unwrap();
+        let mut stmt = conn.prepare("SELECT id, raw_value, filepath FROM ambiguous_secrets WHERE status = 'pending'").unwrap();
+        let rows = stmt.query_map([], |row| {
+            Ok(crate::llm::DiscoveredSecret {
+                id: uuid::Uuid::parse_str(&row.get::<_, String>(0)?).unwrap_or_default(),
+                raw_value: row.get(1)?,
+                filepath: row.get(2)?,
+            })
+        }).unwrap();
+        rows.filter_map(|r| r.ok()).collect()
+    }
+
+    fn mark_accepted(&self, id: uuid::Uuid) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute("UPDATE ambiguous_secrets SET status = 'accepted' WHERE id = ?1", [&id.to_string()]);
+    }
+
+    fn mark_rejected(&self, id: uuid::Uuid) {
+        let conn = self.conn.lock().unwrap();
+        let _ = conn.execute("UPDATE ambiguous_secrets SET status = 'rejected' WHERE id = ?1", [&id.to_string()]);
     }
 }
 
@@ -83,7 +114,7 @@ impl SentinelScanner {
     }
 
     /// Evaluates a raw string chunk, calculates entropy, classifies it, and vaults if KnownProvider.
-    pub fn scan_string(&self, mut raw_value: String) {
+    pub fn scan_string(&self, filepath: &str, mut raw_value: String) {
         if raw_value.len() < 16 {
             return; // Fast path skip: too short
         }
@@ -114,7 +145,7 @@ impl SentinelScanner {
             }
             SecretClassification::Ambiguous => {
                 // Queue for Layer 2 HITL Inbox / LLM batch
-                self.ledger.queue_ambiguous(&raw_value);
+                self.ledger.queue_ambiguous(&raw_value, filepath);
             }
         }
     }
@@ -134,7 +165,10 @@ mod tests {
     struct LocalMockLedger;
     impl LedgerBackend for LocalMockLedger {
         fn save_secret(&self, _hash: &str, _keyring_ref: &str) {}
-        fn queue_ambiguous(&self, _val: &str) {}
+        fn queue_ambiguous(&self, _val: &str, _filepath: &str) {}
+        fn get_ambiguous_secrets(&self) -> Vec<crate::llm::DiscoveredSecret> { vec![] }
+        fn mark_accepted(&self, _id: uuid::Uuid) {}
+        fn mark_rejected(&self, _id: uuid::Uuid) {}
     }
 
     #[test]
@@ -148,7 +182,7 @@ mod tests {
             fake_stripe_key.push('A');
         }
 
-        scanner.scan_string(fake_stripe_key);
+        scanner.scan_string("test.rs", fake_stripe_key);
         // If it compiles and runs without use-after-free or panic, zeroize succeeded.
     }
 }
