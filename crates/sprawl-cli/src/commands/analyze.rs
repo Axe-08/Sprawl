@@ -80,7 +80,7 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
         let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
         let plugin_dir = PathBuf::from(home).join(".sprawl").join("plugins");
 
-        let host = sprawl_plugin_host::PluginHost::new().expect("Failed to init PluginHost");
+        let host = sprawl_plugin_host::PluginHost::new(true, None).expect("Failed to init PluginHost");
         let mut registry = sprawl_plugin_host::PluginRegistry::new();
 
         if let Ok(entries) = std::fs::read_dir(&plugin_dir) {
@@ -88,7 +88,7 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
                 let path = entry.path();
                 if path.extension().and_then(|s| s.to_str()) == Some("wasm") {
                     let name = path.file_stem().unwrap().to_string_lossy().to_string();
-                    if let Ok(plugin) = host.load_plugin(&path, &name) {
+                    if let Ok(plugin) = host.load_plugin(&path, &name, None) {
                         registry.register(plugin);
                     }
                 }

@@ -11,7 +11,7 @@ anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 tokio.workspace = true
-serde = { workspace = true, optional = true }
+serde = { workspace = true, features = ["derive"] }
 sysinfo = "0.30"
 async-trait = "0.1"
 
@@ -33,4 +33,4 @@ sprawl-dev = { path = "../sprawl-dev" }
 [features]
 default = []
 mock-backend = []
-real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest", "serde"]
+real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest"]

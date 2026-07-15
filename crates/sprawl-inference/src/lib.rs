@@ -112,7 +112,6 @@ impl SysInfo for RealSysInfo {
     }
 }
 
-#[cfg(feature = "inference")]
 pub struct LoadedModel {
     pub weights: candle_transformers::models::quantized_llama::ModelWeights,
     pub tokenizer: tokenizers::Tokenizer,
@@ -125,7 +124,6 @@ pub struct InferenceEngine<S: SysInfo> {
     pub state: InferenceStatus,
     sysinfo: S,
 
-    #[cfg(feature = "inference")]
     pub loaded_model: Option<LoadedModel>,
 }
 
@@ -136,7 +134,6 @@ impl<S: SysInfo> InferenceEngine<S> {
             device_target,
             state: InferenceStatus::Cold,
             sysinfo,
-            #[cfg(feature = "inference")]
             loaded_model: None,
         }
     }
@@ -289,24 +286,16 @@ impl<S: SysInfo> InferenceEngine<S> {
             }
         }
 
-        #[cfg(feature = "inference")]
-        {
-            let mut file = std::fs::File::open(path)?;
-            let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)
-                .map_err(|e| InferenceError::Other(e.to_string()))?;
-            let device = candle_core::Device::Cpu;
-            let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
-                .map_err(|e| InferenceError::Other(e.to_string()))?;
-            let tokenizer_path = path.with_file_name("tokenizer.json");
-            let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
-                .map_err(|e| InferenceError::Other(e.to_string()))?;
-            self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
-        }
-
-        #[cfg(not(feature = "inference"))]
-        {
-            tracing::warn!("Inference feature is disabled. Model is not actually loaded.");
-        }
+        let mut file = std::fs::File::open(path)?;
+        let model_content = candle_core::quantized::gguf_file::Content::read(&mut file)
+            .map_err(|e| InferenceError::Other(e.to_string()))?;
+        let device = candle_core::Device::Cpu;
+        let weights = candle_transformers::models::quantized_llama::ModelWeights::from_gguf(model_content, &mut file, &device)
+            .map_err(|e| InferenceError::Other(e.to_string()))?;
+        let tokenizer_path = path.with_file_name("tokenizer.json");
+        let tokenizer = tokenizers::Tokenizer::from_file(&tokenizer_path)
+            .map_err(|e| InferenceError::Other(e.to_string()))?;
+        self.loaded_model = Some(LoadedModel { weights, tokenizer, device });
 
         self.state = InferenceStatus::Ready;
         Ok(())
@@ -330,49 +319,41 @@ impl<S: SysInfo> InferenceEngine<S> {
 
         #[cfg(not(any(test, feature = "mock-backend")))]
         let response = {
-            #[cfg(feature = "inference")]
-            {
-                use candle_transformers::generation::LogitsProcessor;
-                use candle_core::Tensor;
+            use candle_transformers::generation::LogitsProcessor;
+            use candle_core::Tensor;
 
-                let loaded = self.loaded_model.as_mut()
-                    .ok_or_else(|| InferenceError::Other("Model not loaded".into()))?;
-                
-                // Encode prompt
-                let tokens = loaded.tokenizer.encode(prompt, true)
+            let loaded = self.loaded_model.as_mut()
+                .ok_or_else(|| InferenceError::Other("Model not loaded".into()))?;
+            
+            // Encode prompt
+            let tokens = loaded.tokenizer.encode(prompt, true)
+                .map_err(|e| InferenceError::Other(e.to_string()))?;
+            let token_ids = tokens.get_ids().to_vec();
+            
+            // Greedy decode up to 512 tokens
+            let mut all_tokens = token_ids.clone();
+            let mut logits_processor = LogitsProcessor::new(42, Some(0.7), None);
+            let eos_token = loaded.tokenizer.token_to_id("</s>").unwrap_or(2);
+            let mut output = String::new();
+            
+            for _ in 0..512 {
+                let input = Tensor::new(all_tokens.as_slice(), &loaded.device)
+                    .map_err(|e| InferenceError::Other(e.to_string()))?
+                    .unsqueeze(0)
                     .map_err(|e| InferenceError::Other(e.to_string()))?;
-                let token_ids = tokens.get_ids().to_vec();
                 
-                // Greedy decode up to 512 tokens
-                let mut all_tokens = token_ids.clone();
-                let mut logits_processor = LogitsProcessor::new(42, Some(0.7), None);
-                let eos_token = loaded.tokenizer.token_to_id("</s>").unwrap_or(2);
-                let mut output = String::new();
+                let logits = loaded.weights.forward(&input, all_tokens.len() - 1)
+                    .map_err(|e| InferenceError::Other(e.to_string()))?;
+                let next_token = logits_processor.sample(&logits)
+                    .map_err(|e| InferenceError::Other(e.to_string()))?;
                 
-                for _ in 0..512 {
-                    let input = Tensor::new(all_tokens.as_slice(), &loaded.device)
-                        .map_err(|e| InferenceError::Other(e.to_string()))?
-                        .unsqueeze(0)
-                        .map_err(|e| InferenceError::Other(e.to_string()))?;
-                    
-                    let logits = loaded.weights.forward(&input, all_tokens.len() - 1)
-                        .map_err(|e| InferenceError::Other(e.to_string()))?;
-                    let next_token = logits_processor.sample(&logits)
-                        .map_err(|e| InferenceError::Other(e.to_string()))?;
-                    
-                    if next_token == eos_token { break; }
-                    all_tokens.push(next_token);
-                    if let Ok(word) = loaded.tokenizer.decode(&[next_token], true) {
-                        output.push_str(&word);
-                    }
+                if next_token == eos_token { break; }
+                all_tokens.push(next_token);
+                if let Ok(word) = loaded.tokenizer.decode(&[next_token], true) {
+                    output.push_str(&word);
                 }
-                output
             }
-            #[cfg(not(feature = "inference"))]
-            {
-                tracing::warn!("Inference feature is disabled.");
-                String::from("{\"classification\": \"ambiguous\", \"reason\": \"Inference feature disabled\"}")
-            }
+            output
         };
 
         self.state = InferenceStatus::Cold;

@@ -24,20 +24,20 @@ pub fn handle_crossterm_event(
                             app.search.is_searching = true;
 
                             let tx_clone = tx.clone();
-                            let _query = app.search.query.clone();
+                            let query = app.search.query.clone();
 
                             tokio::spawn(async move {
-                                tokio::time::sleep(std::time::Duration::from_millis(300)).await;
-
-                                let mock_result = sprawl_archivist::SearchResult {
-                                    project_id: "demo-project".to_string(),
-                                    file_path: "src/main.rs".to_string(),
-                                    start_line: 1,
-                                    end_line: 8,
-                                    similarity_score: 0.95,
-                                    chunk_text: "fn main() {\n    println!(\"Hello\");\n}".to_string(),
-                                };
-                                let _ = tx_clone.send(AppEvent::SearchResult(vec![mock_result]));
+                                let client_res = sprawl_daemon::IpcClient::new();
+                                if let Ok(client) = client_res {
+                                    let req = sprawl_daemon::IpcRequest::Search { query, top_k: 10 };
+                                    if let Ok(sprawl_daemon::IpcResponse::SearchResults(results)) = client.send_request(&req).await {
+                                        let _ = tx_clone.send(AppEvent::SearchResult(results));
+                                    } else {
+                                        let _ = tx_clone.send(AppEvent::SearchError("IPC search failed".into()));
+                                    }
+                                } else {
+                                    let _ = tx_clone.send(AppEvent::SearchError("Failed to init IPC client".into()));
+                                }
                             });
                         }
                         KeyCode::Char(c) => {
@@ -95,9 +95,25 @@ pub fn handle_crossterm_event(
                     }
                     KeyCode::Char('k') if app.current_tab == Tab::SentinelInbox => {
                         app.sentinel_accept_selected();
+                        if let Some(item) = app.sentinel.items.get(app.sentinel.selected_index) {
+                            let id = item.secret.id;
+                            tokio::spawn(async move {
+                                if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                    let _ = client.send_request(&sprawl_daemon::IpcRequest::SentinelAccept { id }).await;
+                                }
+                            });
+                        }
                     }
                     KeyCode::Char('n') if app.current_tab == Tab::SentinelInbox => {
                         app.sentinel_reject_selected();
+                        if let Some(item) = app.sentinel.items.get(app.sentinel.selected_index) {
+                            let id = item.secret.id;
+                            tokio::spawn(async move {
+                                if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                    let _ = client.send_request(&sprawl_daemon::IpcRequest::SentinelReject { id }).await;
+                                }
+                            });
+                        }
                     }
                     KeyCode::Enter if app.current_tab == Tab::SentinelInbox => {
                         if let Some(item) = app.sentinel.items.get_mut(app.sentinel.selected_index)
@@ -226,6 +242,14 @@ pub fn handle_app_event(app: &mut App, event: AppEvent) {
         }
         AppEvent::SearchError(_) => {
             app.search.is_searching = false;
+        }
+        AppEvent::SentinelInboxResult(secrets) => {
+            app.sentinel.items = secrets.into_iter().map(|s| crate::app::InboxItem {
+                secret: s,
+                review: None,
+                expanded: false,
+            }).collect();
+            app.sentinel.selected_index = 0;
         }
     }
 }

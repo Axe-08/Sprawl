@@ -8127,13 +8127,17 @@ dependencies = [
  "anyhow",
  "libc",
  "notify",
+ "serde",
  "serde_json",
+ "sprawl-archivist",
  "sprawl-core",
+ "sprawl-sentinel",
  "tempfile",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
  "tracing-appender",
+ "uuid",
 ]
 
 [[package]]
@@ -8177,6 +8181,7 @@ dependencies = [
  "anyhow",
  "assert_cmd",
  "predicates",
+ "rusqlite",
  "serde_json",
  "sprawl-archivist",
  "sprawl-core",
@@ -8246,6 +8251,7 @@ dependencies = [
  "futures",
  "ratatui",
  "sprawl-archivist",
+ "sprawl-daemon",
  "sprawl-sentinel",
  "tokio",
  "uuid",

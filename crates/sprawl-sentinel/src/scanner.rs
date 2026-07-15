@@ -12,12 +12,10 @@ pub trait LedgerBackend: Send + Sync {
     fn queue_ambiguous(&self, val: &str);
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 pub struct OsKeyringStore {
     service_name: String,
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 impl OsKeyringStore {
     pub fn new(service_name: &str) -> Self {
         Self {
@@ -26,7 +24,6 @@ impl OsKeyringStore {
     }
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 impl KeyringBackend for OsKeyringStore {
     fn vault_secret(&self, val: &str) -> String {
         let id = uuid::Uuid::new_v4().to_string();
@@ -37,12 +34,10 @@ impl KeyringBackend for OsKeyringStore {
     }
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 pub struct SqliteLedgerStore {
     conn: std::sync::Mutex<rusqlite::Connection>,
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 impl SqliteLedgerStore {
     pub fn new(conn: rusqlite::Connection) -> Self {
         Self {
@@ -51,7 +46,6 @@ impl SqliteLedgerStore {
     }
 }
 
-#[cfg(not(any(test, feature = "mock-backend")))]
 impl LedgerBackend for SqliteLedgerStore {
     fn save_secret(&self, hash: &str, keyring_ref: &str) {
         let conn = self.conn.lock().unwrap();
@@ -104,10 +98,6 @@ impl SentinelScanner {
         match classification.status {
             SecretClassification::KnownProvider(_provider_name) => {
                 // M10 Flow: Vault immediately
-                #[cfg(any(test, feature = "mock-backend"))]
-                let _hash = "mock_sha256_hash".to_string(); // Implementation detail
-
-                #[cfg(not(any(test, feature = "mock-backend")))]
                 let _hash = {
                     use sha2::{Digest, Sha256};
                     hex::encode(Sha256::digest(raw_value.as_bytes()))

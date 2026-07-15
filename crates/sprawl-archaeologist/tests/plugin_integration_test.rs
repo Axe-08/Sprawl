@@ -19,7 +19,7 @@ fn plugins_available() -> bool {
 }
 
 async fn setup_archaeologist() -> Archaeologist {
-    let host = PluginHost::new().expect("Failed to initialize plugin host");
+    let host = PluginHost::new(true, None).expect("Failed to initialize plugin host");
     let mut registry = PluginRegistry::new();
 
     let dir = plugin_dir();
@@ -33,7 +33,7 @@ async fn setup_archaeologist() -> Archaeologist {
         let path = dir.join(file);
         if path.exists() {
             let plugin = host
-                .load_plugin(&path, name)
+                .load_plugin(&path, name, None)
                 .expect("Failed to load plugin");
             registry.register(plugin);
         }

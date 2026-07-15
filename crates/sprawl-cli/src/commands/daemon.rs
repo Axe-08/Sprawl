@@ -39,33 +39,36 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             ctx.start(move || {
                 let rt = tokio::runtime::Handle::current();
                 
-                if auto_index_flag {
-                    rt.spawn(async move {
-                        let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-                        #[allow(unused_variables)]
-                        let data_dir = std::path::PathBuf::from(home).join(".sprawl").join("archivist");
-                        
-                        #[cfg(feature = "real-archivist")]
-                        let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
-                        #[cfg(not(feature = "real-archivist"))]
-                        let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
-                        
-                        match archivist_result {
-                            Ok(mut archivist) => {
-                                tracing::info!("Starting background indexer on daemon boot");
-                                if let Err(e) = archivist.start_background_indexer(sprawl_archivist::SysRamMonitor) {
-                                    tracing::error!("Failed to start indexer: {}", e);
-                                }
-                            }
-                            Err(e) => {
-                                tracing::error!("Failed to initialize archivist for auto-indexing: {}", e);
-                            }
-                        }
-                    });
-                }
-                
                 rt.block_on(async {
-                    if let Err(e) = sprawl_daemon::run_daemon_loop().await {
+                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                    let data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("archivist");
+                    
+                    #[cfg(feature = "real-archivist")]
+                    let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
+                    #[cfg(not(feature = "real-archivist"))]
+                    let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
+                    
+                    let mut archivist = match archivist_result {
+                        Ok(a) => a,
+                        Err(e) => {
+                            tracing::error!("Failed to init archivist: {}", e);
+                            return;
+                        }
+                    };
+
+                    if auto_index_flag {
+                        tracing::info!("Starting background indexer on daemon boot");
+                        if let Err(e) = archivist.start_background_indexer(sprawl_archivist::SysRamMonitor) {
+                            tracing::error!("Failed to start indexer: {}", e);
+                        }
+                    }
+
+                    let archivist = std::sync::Arc::new(archivist);
+
+                    let sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
+                    let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(&sentinel_data_dir).unwrap());
+
+                    if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel).await {
                         tracing::error!("Daemon loop failed: {}", e);
                     }
                 });

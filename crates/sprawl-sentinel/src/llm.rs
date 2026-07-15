@@ -2,7 +2,7 @@ use crate::classify::SecretClassification;
 use sprawl_inference::{InferenceEngine, Result as InferenceResult};
 use uuid::Uuid;
 
-#[derive(Debug, Clone)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, Clone, PartialEq)]
 pub struct DiscoveredSecret {
     pub id: Uuid,
     pub raw_value: String,

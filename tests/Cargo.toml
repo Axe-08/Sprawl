@@ -32,6 +32,10 @@ path = "integration/inference_real_test.rs"
 name = "tui_state_test"
 path = "integration/tui_state_test.rs"
 
+[[test]]
+name = "ipc_test"
+path = "integration/ipc_test.rs"
+
 [dependencies]
 sprawl-core = { path = "../crates/sprawl-core" }
 sprawl-sweeper = { path = "../crates/sprawl-sweeper" }
@@ -43,6 +47,7 @@ sprawl-archivist = { path = "../crates/sprawl-archivist" }
 tempfile = "3.10"
 uuid = { version = "1.2", features = ["v4"] }
 tokio = { workspace = true }
+rusqlite = "0.31.0"
 anyhow = { workspace = true }
 assert_cmd = "2.0.12"
 predicates = "3.0.4"
@@ -68,6 +73,9 @@ path = "integration/resurrect_test.rs"
 name = "profile_machine_test"
 path = "integration/profile_machine_test.rs"
 
+[[test]]
+name = "sqlite_ledger_test"
+path = "integration/sqlite_ledger_test.rs"
+
 [features]
 real-archivist = ["sprawl-archivist/real-archivist"]
-real-inference = ["sprawl-inference/inference"]

@@ -28,6 +28,7 @@ pub enum AppEvent {
     BatchClassifyResult(Vec<(Uuid, SecretClassification)>),
     SearchResult(Vec<SearchResult>),
     SearchError(String),
+    SentinelInboxResult(Vec<DiscoveredSecret>),
 }
 
 pub struct InboxItem {

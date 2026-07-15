@@ -12,6 +12,7 @@ sprawl-sentinel = { path = "../sprawl-sentinel" }
 sprawl-archivist = { path = "../sprawl-archivist" }
 uuid = { workspace = true }
 tokio = { workspace = true }
+sprawl-daemon = { path = "../sprawl-daemon" }
 futures = "0.3.32"
 
 [features]

@@ -17,6 +17,9 @@ pub use exports::sprawl::stack_detector::detector::{
     Dependency, ReproducibilityVerdict, StackInfo,
 };
 
+pub mod verify;
+pub use verify::{Ed25519Verifier, PluginManifest};
+
 pub struct HostState {
     pub wasi_ctx: WasiCtx,
     pub resource_table: ResourceTable,
@@ -34,6 +37,8 @@ impl WasiView for HostState {
 pub struct PluginHost {
     engine: Engine,
     linker: wasmtime::component::Linker<HostState>,
+    allow_unsigned: bool,
+    verifier: Option<verify::Ed25519Verifier>,
 }
 
 pub struct LoadedPlugin {
@@ -42,7 +47,7 @@ pub struct LoadedPlugin {
 }
 
 impl PluginHost {
-    pub fn new() -> Result<Self> {
+    pub fn new(allow_unsigned: bool, public_key_bytes: Option<&[u8; ed25519_dalek::PUBLIC_KEY_LENGTH]>) -> Result<Self> {
         let mut config = Config::new();
         config.wasm_component_model(true);
         // No async_support — we use the sync linker and sync instantiation.
@@ -53,11 +58,28 @@ impl PluginHost {
 
         // Sync WASI linker (matches non-async store).
         wasmtime_wasi::p2::add_to_linker_sync(&mut linker)?;
+        
+        let verifier = if let Some(bytes) = public_key_bytes {
+            Some(verify::Ed25519Verifier::new(bytes)?)
+        } else {
+            None
+        };
 
-        Ok(Self { engine, linker })
+        Ok(Self { engine, linker, allow_unsigned, verifier })
     }
 
-    pub fn load_plugin(&self, path: &Path, name: &str) -> Result<LoadedPlugin> {
+    pub fn load_plugin(&self, path: &Path, name: &str, manifest: Option<&verify::PluginManifest>) -> Result<LoadedPlugin> {
+        if let Some(manifest) = manifest {
+            if let Some(verifier) = &self.verifier {
+                if !verifier.verify_file(path, &manifest.signature_hex)? {
+                    return Err(anyhow::anyhow!("Signature verification failed for plugin: {}", name));
+                }
+            } else if !self.allow_unsigned {
+                 return Err(anyhow::anyhow!("No verifier configured and unsigned plugins are not allowed"));
+            }
+        } else if !self.allow_unsigned {
+            return Err(anyhow::anyhow!("Plugin is unsigned and --allow-unsigned was not provided"));
+        }
         let component = Component::from_file(&self.engine, path).map_err(|e| {
             anyhow::anyhow!(
                 "Failed to load plugin component from {}: {}",

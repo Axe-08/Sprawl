@@ -1,7 +1,7 @@
 use regex::Regex;
 use std::sync::OnceLock;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(serde::Serialize, serde::Deserialize, Debug, PartialEq, Eq, Clone)]
 pub enum SecretClassification {
     KnownProvider(String), // Provider name e.g. "Stripe Live"
     FilteredNoise(String), // Reason e.g. "UUID", "Git SHA"

@@ -35,6 +35,16 @@ async fn run_async() -> io::Result<()> {
     let mut event_stream = crossterm::event::EventStream::new();
     use futures::StreamExt;
 
+    // Fetch initial Sentinel Inbox
+    let tx_clone = tx.clone();
+    tokio::spawn(async move {
+        if let Ok(client) = sprawl_daemon::IpcClient::new() {
+            if let Ok(sprawl_daemon::IpcResponse::SentinelInbox(items)) = client.send_request(&sprawl_daemon::IpcRequest::GetSentinelInbox).await {
+                let _ = tx_clone.send(AppEvent::SentinelInboxResult(items));
+            }
+        }
+    });
+
     loop {
         terminal.draw(|f| ui::draw(f, &mut app))?;
 

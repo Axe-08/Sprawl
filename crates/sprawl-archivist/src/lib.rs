@@ -34,6 +34,7 @@ pub struct IndexedChunk {
     pub indexed_at: String,  // ISO 8601
 }
 
+#[derive(serde::Serialize, serde::Deserialize, Clone, Debug, PartialEq)]
 pub struct SearchResult {
     pub project_id: String,
     pub file_path: String,
@@ -171,8 +172,8 @@ impl Archivist {
     }
 
     pub fn start_background_indexer<R: RamMonitor + 'static>(&mut self, monitor: R) -> Result<()> {
-        let db_clone = self.db.clone();
-        let embedder_clone = self.embedder.clone();
+        let _db_clone = self.db.clone();
+        let _embedder_clone = self.embedder.clone();
 
         let handle = std::thread::spawn(move || {
             // In a real environment, set thread priority: set_low_priority().ok();

@@ -17,6 +17,12 @@ pub enum PluginAction {
         /// Optional SHA-256 checksum to verify the plugin before installation
         #[arg(long)]
         checksum: Option<String>,
+        /// Optional path to a manifest.json containing the Ed25519 signature
+        #[arg(long)]
+        manifest: Option<PathBuf>,
+        /// Allow installing unsigned plugins
+        #[arg(long)]
+        allow_unsigned: bool,
     },
     /// List all installed plugins
     List,
@@ -37,7 +43,7 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
     }
 
     match &args.action {
-        PluginAction::Install { source, checksum } => {
+        PluginAction::Install { source, checksum, manifest, allow_unsigned } => {
             if !source.exists() {
                 return Err(sprawl_core::SprawlError::Other(
                     "Source file does not exist".into(),
@@ -69,6 +75,26 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
                 if !is_json {
                     println!("Checksum verified successfully.");
                 }
+            }
+
+            if let Some(manifest_path) = manifest {
+                let manifest_str = std::fs::read_to_string(manifest_path)
+                    .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to read manifest: {}", e)))?;
+                let parsed: sprawl_plugin_host::verify::PluginManifest = serde_json::from_str(&manifest_str)
+                    .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to parse manifest: {}", e)))?;
+                
+                // For MVP, we use a fixed mock public key for community plugins
+                let public_key_bytes = [0u8; 32]; // Replace with real key in production
+                let host = sprawl_plugin_host::PluginHost::new(*allow_unsigned, Some(&public_key_bytes))
+                    .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to init PluginHost: {}", e)))?;
+                
+                let name = source.file_stem().unwrap().to_string_lossy().to_string();
+                let _ = host.load_plugin(source, &name, Some(&parsed))
+                    .map_err(|e| sprawl_core::SprawlError::Other(format!("Plugin verification failed: {}", e)))?;
+            } else if !*allow_unsigned {
+                 return Err(sprawl_core::SprawlError::Other(
+                    "Cannot install unsigned plugin unless --allow-unsigned is provided".into()
+                ));
             }
 
             let name = source.file_stem().unwrap().to_string_lossy().to_string();

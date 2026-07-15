@@ -11,9 +11,9 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(temp_dir) = TempDir::new() {
         let wasm_path = temp_dir.path().join("fuzz.wasm");
         if fs::write(&wasm_path, data).is_ok() {
-            if let Ok(host) = PluginHost::new() {
+            if let Ok(host) = PluginHost::new(true, None) {
                 // We just want to see if this panics
-                let _ = host.load_plugin(&wasm_path, "fuzzer");
+                let _ = host.load_plugin(&wasm_path, "fuzzer", None);
             }
         }
     }
