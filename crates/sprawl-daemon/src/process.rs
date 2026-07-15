@@ -20,7 +20,11 @@ impl DaemonContext {
         })
     }
 
-    pub fn start(&self, run_loop: impl FnOnce() -> Result<()>) -> Result<()> {
+    pub async fn start<F, Fut>(&self, run_loop: F) -> Result<()>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<()>>,
+    {
         if self.pid_file.exists() {
             tracing::warn!("PID file exists, checking if daemon is stale...");
             let _ = std::fs::remove_file(&self.pid_file);
@@ -32,7 +36,7 @@ impl DaemonContext {
         std::fs::write(&self.pid_file, pid.to_string()).map_err(sprawl_core::SprawlError::Io)?;
         tracing::info!("Daemon started successfully (foreground blocking)");
 
-        let res = run_loop();
+        let res = run_loop().await;
 
         let _ = std::fs::remove_file(&self.pid_file);
         res

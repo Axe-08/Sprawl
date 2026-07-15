@@ -70,7 +70,7 @@ async fn main() {
         .init();
 
     let result = match &cli.command {
-        Command::Daemon(args) => commands::daemon::handle(args, cli.json),
+        Command::Daemon(args) => commands::daemon::handle(args, cli.json).await,
         Command::Plugin(args) => commands::plugin::handle(args, cli.json),
         Command::Restore(args) => commands::restore::handle(args, cli.json),
         Command::Verify(args) => commands::verify::handle(args, cli.json),

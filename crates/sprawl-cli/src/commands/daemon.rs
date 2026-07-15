@@ -26,7 +26,7 @@ pub enum DaemonAction {
     Status,
 }
 
-pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
+pub async fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
     match &args.action {
         DaemonAction::Start { auto_index } => {
             let ctx = sprawl_daemon::process::DaemonContext::new()?;
@@ -36,70 +36,66 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             
             let auto_index_flag = *auto_index;
             
-            ctx.start(move || {
-                let rt = tokio::runtime::Handle::current();
+            ctx.start(|| async move {
+                let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                let data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("archivist");
                 
-                rt.block_on(async {
-                    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-                    let data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("archivist");
-                    
-                    #[cfg(feature = "real-archivist")]
-                    let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
-                    #[cfg(not(feature = "real-archivist"))]
-                    let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
-                    
-                    let mut archivist = match archivist_result {
-                        Ok(a) => a,
-                        Err(e) => {
-                            tracing::error!("Failed to init archivist: {}", e);
-                            return;
-                        }
-                    };
-
-                    if auto_index_flag {
-                        tracing::info!("Starting background indexer on daemon boot");
-                        if let Err(e) = archivist.start_background_indexer(sprawl_archivist::SysRamMonitor) {
-                            tracing::error!("Failed to start indexer: {}", e);
-                        }
+                #[cfg(feature = "real-archivist")]
+                let archivist_result = sprawl_archivist::Archivist::new_real(&data_dir).await;
+                #[cfg(not(feature = "real-archivist"))]
+                let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
+                
+                let mut archivist = match archivist_result {
+                    Ok(a) => a,
+                    Err(e) => {
+                        tracing::error!("Failed to init archivist: {}", e);
+                        return Err(sprawl_core::SprawlError::Other(format!("Failed to init archivist: {}", e)));
                     }
+                };
 
-                    let archivist = std::sync::Arc::new(archivist);
-
-                    let sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
-                    let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
-                    let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
-                    let conn = rusqlite::Connection::open(&ledger_path).expect("Failed to open ledger");
-                    let _ = conn.execute(
-                        "CREATE TABLE IF NOT EXISTS secrets (
-                            id TEXT PRIMARY KEY,
-                            source_file TEXT NOT NULL,
-                            classification TEXT NOT NULL,
-                            key_hash TEXT NOT NULL,
-                            discovered_at TEXT NOT NULL,
-                            keyring_ref TEXT NOT NULL
-                        )",
-                        []
-                    );
-                    let _ = conn.execute(
-                        "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
-                            id TEXT PRIMARY KEY,
-                            raw_value TEXT NOT NULL,
-                            filepath TEXT NOT NULL,
-                            status TEXT NOT NULL
-                        )",
-                        []
-                    );
-                    let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
-                    
-                    let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(vec![], keyring, ledger));
-
-                    let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
-                    if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel, ledger_path).await {
-                        tracing::error!("Daemon loop failed: {}", e);
+                if auto_index_flag {
+                    tracing::info!("Starting background indexer on daemon boot");
+                    if let Err(e) = archivist.start_background_indexer(sprawl_archivist::SysRamMonitor) {
+                        tracing::error!("Failed to start indexer: {}", e);
                     }
-                });
+                }
+
+                let archivist = std::sync::Arc::new(archivist);
+
+                let _sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
+                let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
+                let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
+                let conn = rusqlite::Connection::open(&ledger_path).expect("Failed to open ledger");
+                let _ = conn.execute(
+                    "CREATE TABLE IF NOT EXISTS secrets (
+                        id TEXT PRIMARY KEY,
+                        source_file TEXT NOT NULL,
+                        classification TEXT NOT NULL,
+                        key_hash TEXT NOT NULL,
+                        discovered_at TEXT NOT NULL,
+                        keyring_ref TEXT NOT NULL
+                    )",
+                    []
+                );
+                let _ = conn.execute(
+                    "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
+                        id TEXT PRIMARY KEY,
+                        raw_value TEXT NOT NULL,
+                        filepath TEXT NOT NULL,
+                        status TEXT NOT NULL
+                    )",
+                    []
+                );
+                let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
+                
+                let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(vec![], keyring, ledger));
+
+                let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
+                if let Err(e) = sprawl_daemon::run_daemon_loop(archivist, sentinel, ledger_path).await {
+                    tracing::error!("Daemon loop failed: {}", e);
+                }
                 Ok(())
-            })?;
+            }).await?;
         }
         DaemonAction::Stop { force: _ } => {
             let ctx = sprawl_daemon::process::DaemonContext::new()?;
