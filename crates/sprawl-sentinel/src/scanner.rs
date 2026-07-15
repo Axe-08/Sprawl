@@ -149,6 +149,18 @@ impl SentinelScanner {
             }
         }
     }
+
+    pub fn get_ambiguous_secrets(&self) -> Vec<crate::llm::DiscoveredSecret> {
+        self.ledger.get_ambiguous_secrets()
+    }
+
+    pub fn mark_accepted(&self, id: uuid::Uuid) {
+        self.ledger.mark_accepted(id);
+    }
+
+    pub fn mark_rejected(&self, id: uuid::Uuid) {
+        self.ledger.mark_rejected(id);
+    }
 }
 
 #[cfg(test)]

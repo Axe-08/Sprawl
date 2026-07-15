@@ -56,13 +56,26 @@ pub async fn run_daemon_loop(
                                             }
                                         }
                                         IpcRequest::GetSentinelInbox => {
-                                            IpcResponse::SentinelInbox(vec![])
+                                            IpcResponse::SentinelInbox(_sentinel_clone.get_ambiguous_secrets())
                                         }
-                                        IpcRequest::SentinelAccept { id: _ } => {
+                                        IpcRequest::SentinelAccept { id } => {
+                                            _sentinel_clone.mark_accepted(id);
                                             IpcResponse::Ok
                                         }
-                                        IpcRequest::SentinelReject { id: _ } => {
+                                        IpcRequest::SentinelReject { id } => {
+                                            _sentinel_clone.mark_rejected(id);
                                             IpcResponse::Ok
+                                        }
+                                        IpcRequest::BatchClassify { secrets } => {
+                                            let mut engine = sprawl_inference::InferenceEngine::new(
+                                                sprawl_inference::DEFAULT_MODEL,
+                                                sprawl_inference::DeviceTarget::Cpu,
+                                                sprawl_inference::RealSysInfo,
+                                            );
+                                            match sprawl_sentinel::llm::batch_classify(&secrets, &mut engine).await {
+                                                Ok(results) => IpcResponse::BatchClassifyResult(results),
+                                                Err(e) => IpcResponse::Error(e.to_string()),
+                                            }
                                         }
                                     };
                                     

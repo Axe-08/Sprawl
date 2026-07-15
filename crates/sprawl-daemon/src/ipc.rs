@@ -10,6 +10,7 @@ pub enum IpcRequest {
     GetSentinelInbox,
     SentinelAccept { id: uuid::Uuid },
     SentinelReject { id: uuid::Uuid },
+    BatchClassify { secrets: Vec<sprawl_sentinel::llm::DiscoveredSecret> },
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -17,6 +18,7 @@ pub enum IpcResponse {
     Pong { pid: u32, uptime_secs: u64 },
     SearchResults(Vec<sprawl_archivist::SearchResult>),
     SentinelInbox(Vec<sprawl_sentinel::llm::DiscoveredSecret>),
+    BatchClassifyResult(Vec<(uuid::Uuid, sprawl_sentinel::classify::SecretClassification)>),
     Ok,
     Error(String),
 }

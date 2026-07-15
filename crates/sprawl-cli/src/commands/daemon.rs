@@ -80,6 +80,15 @@ pub fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                         )",
                         []
                     );
+                    let _ = conn.execute(
+                        "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
+                            id TEXT PRIMARY KEY,
+                            raw_value TEXT NOT NULL,
+                            filepath TEXT NOT NULL,
+                            status TEXT NOT NULL
+                        )",
+                        []
+                    );
                     let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
                     
                     let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(vec![], keyring, ledger));

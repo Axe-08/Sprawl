@@ -41,6 +41,15 @@ pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
         )",
         []
     );
+    let _ = conn.execute(
+        "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
+            id TEXT PRIMARY KEY,
+            raw_value TEXT NOT NULL,
+            filepath TEXT NOT NULL,
+            status TEXT NOT NULL
+        )",
+        []
+    );
     let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
 
     let scanner = SentinelScanner::new(vec![], keyring, ledger);
@@ -82,7 +91,7 @@ pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
                                 entropy_score: entropy as f32,
                                 raw_value: token.to_string(),
                             });
-                            let _ = scanner.scan_string(token.to_string());
+                            let _ = scanner.scan_string(&display_path, token.to_string());
                         }
                     }
                 }

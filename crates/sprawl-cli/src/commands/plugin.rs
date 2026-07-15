@@ -83,8 +83,7 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
                 let parsed: sprawl_plugin_host::verify::PluginManifest = serde_json::from_str(&manifest_str)
                     .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to parse manifest: {}", e)))?;
                 
-                // For MVP, we use a fixed mock public key for community plugins
-                let public_key_bytes = [0u8; 32]; // Replace with real key in production
+                let public_key_bytes = sprawl_plugin_host::verify::COMMUNITY_SIGNING_KEY;
                 let host = sprawl_plugin_host::PluginHost::new(*allow_unsigned, Some(&public_key_bytes))
                     .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to init PluginHost: {}", e)))?;
                 

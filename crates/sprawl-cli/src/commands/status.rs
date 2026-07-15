@@ -41,12 +41,28 @@ pub fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
         "mock"
     };
 
-    // Stubs for ledger-backed counts (M19 will wire these up)
-    let projects_active = 0;
-    let projects_idle = 0;
-    let sentinel_unreviewed = 0;
+    let mut projects_active = 0;
+    let mut projects_idle = 0;
+    let mut sentinel_unreviewed = 0;
     let sweeper_queue_total = 0;
     let sweeper_nuke_eligible = 0;
+
+    if let Ok(ledger_path) = sprawl_core::platform::sprawl_data_dir().map(|d| d.join("ledger.sqlite")) {
+        if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+            let _ = conn.query_row("SELECT count(*) FROM projects WHERE status = 'active'", [], |row| {
+                projects_active = row.get::<_, usize>(0).unwrap_or(0);
+                Ok(())
+            });
+            let _ = conn.query_row("SELECT count(*) FROM projects WHERE status = 'idle'", [], |row| {
+                projects_idle = row.get::<_, usize>(0).unwrap_or(0);
+                Ok(())
+            });
+            let _ = conn.query_row("SELECT count(*) FROM ambiguous_secrets WHERE status = 'pending'", [], |row| {
+                sentinel_unreviewed = row.get::<_, usize>(0).unwrap_or(0);
+                Ok(())
+            });
+        }
+    }
 
     if is_json {
         println!(

@@ -57,16 +57,46 @@ pub fn handle_crossterm_event(
                         if app.current_tab == Tab::SemanticSearch && app.search.phase == SearchPhase::Input {
                             app.input_mode = true;
                         }
+                        if app.current_tab == Tab::SentinelInbox {
+                            let tx_clone = tx.clone();
+                            tokio::spawn(async move {
+                                if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                    if let Ok(sprawl_daemon::IpcResponse::SentinelInbox(secrets)) = client.send_request(&sprawl_daemon::IpcRequest::GetSentinelInbox).await {
+                                        let _ = tx_clone.send(AppEvent::SentinelInboxResult(secrets));
+                                    }
+                                }
+                            });
+                        }
                     }
                     KeyCode::BackTab => {
                         app.previous_tab();
                         if app.current_tab == Tab::SemanticSearch && app.search.phase == SearchPhase::Input {
                             app.input_mode = true;
                         }
+                        if app.current_tab == Tab::SentinelInbox {
+                            let tx_clone = tx.clone();
+                            tokio::spawn(async move {
+                                if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                    if let Ok(sprawl_daemon::IpcResponse::SentinelInbox(secrets)) = client.send_request(&sprawl_daemon::IpcRequest::GetSentinelInbox).await {
+                                        let _ = tx_clone.send(AppEvent::SentinelInboxResult(secrets));
+                                    }
+                                }
+                            });
+                        }
                     }
                     KeyCode::Char('1') => app.current_tab = Tab::Dashboard,
                     KeyCode::Char('2') => app.current_tab = Tab::SweeperInbox,
-                    KeyCode::Char('3') => app.current_tab = Tab::SentinelInbox,
+                    KeyCode::Char('3') => {
+                        app.current_tab = Tab::SentinelInbox;
+                        let tx_clone = tx.clone();
+                        tokio::spawn(async move {
+                            if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                if let Ok(sprawl_daemon::IpcResponse::SentinelInbox(secrets)) = client.send_request(&sprawl_daemon::IpcRequest::GetSentinelInbox).await {
+                                    let _ = tx_clone.send(AppEvent::SentinelInboxResult(secrets));
+                                }
+                            }
+                        });
+                    }
                     KeyCode::Char('4') => {
                         app.current_tab = Tab::SemanticSearch;
                         if app.search.phase == SearchPhase::Input {
@@ -137,11 +167,10 @@ pub fn handle_crossterm_event(
                                 tokio::time::sleep(std::time::Duration::from_millis(500)).await;
 
                                 let mut results = Vec::new();
-                                for s in items {
-                                    results.push((
-                                        s.id,
-                                        sprawl_sentinel::classify::SecretClassification::FilteredNoise("mock".to_string()),
-                                    ));
+                                if let Ok(client) = sprawl_daemon::IpcClient::new() {
+                                    if let Ok(sprawl_daemon::IpcResponse::BatchClassifyResult(res)) = client.send_request(&sprawl_daemon::IpcRequest::BatchClassify { secrets: items }).await {
+                                        results = res;
+                                    }
                                 }
                                 let _ = tx_clone.send(AppEvent::BatchClassifyResult(results));
                             });

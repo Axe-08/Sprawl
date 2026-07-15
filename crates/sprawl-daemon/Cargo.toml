@@ -7,6 +7,7 @@ repository.workspace = true
 
 [dependencies]
 sprawl-core = { path = "../sprawl-core" }
+sprawl-inference = { path = "../sprawl-inference" }
 notify = "6"
 tokio.workspace = true
 tracing.workspace = true
@@ -19,6 +20,11 @@ uuid = { workspace = true }
 sprawl-sentinel = { path = "../sprawl-sentinel" }
 sprawl-archivist = { path = "../sprawl-archivist" }
 rusqlite = "0.31.0"
+
+[features]
+default = []
+mock-backend = ["sprawl-inference/mock-backend"]
+real-inference = ["sprawl-inference/real-inference"]
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

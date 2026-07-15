@@ -35,7 +35,7 @@ walkdir = "2.5.0"
 
 [features]
 default = []
-mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend"]
+mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend", "sprawl-daemon/mock-backend"]
 debug = ["mock-backend"]
-real-inference = ["sprawl-inference/real-inference"]
+real-inference = ["sprawl-inference/real-inference", "sprawl-daemon/real-inference"]
 real-archivist = ["sprawl-archivist/real-archivist"]
