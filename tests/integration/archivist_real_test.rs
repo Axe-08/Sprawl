@@ -32,7 +32,7 @@ fn test_sysram_monitor_returns_nonzero() {
 #[tokio::test]
 async fn test_real_archivist_search() {
     // This test will only run when real-archivist feature is enabled.
-    // It verifies that LanceDB and OnnxEmbedder instantiate successfully.
+    // It verifies that LanceDB and CandleEmbedder instantiate successfully.
     let temp_dir = tempfile::tempdir().unwrap();
     let archivist = Archivist::new_real(temp_dir.path()).await.unwrap();
     

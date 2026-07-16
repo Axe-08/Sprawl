@@ -6,7 +6,7 @@ use std::fs;
 
 #[derive(Args)]
 pub struct ScanArgs {
-    /// Directory to scan
+    /// Directory to scan for secrets (Note: This is for Sentinel secret scanning, not project indexing. Use `sprawl index --start` for indexing)
     #[arg(default_value = ".")]
     pub dir: PathBuf,
     /// Emit JSON array of findings
