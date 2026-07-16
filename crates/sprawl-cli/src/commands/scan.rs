@@ -13,7 +13,7 @@ pub struct ScanArgs {
     #[arg(long)]
     pub json: bool,
     /// Entropy threshold
-    #[arg(long, default_value_t = 4.0)]
+    #[arg(long, default_value_t = 4.5)]
     pub threshold: f32,
 }
 
@@ -27,29 +27,8 @@ struct Finding {
 pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
     let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
     let ledger_path = sprawl_core::platform::sprawl_data_dir()?.join("ledger.sqlite");
-    let conn = rusqlite::Connection::open(&ledger_path)
+    let conn = sprawl_core::ledger::initialize_db(&ledger_path)
         .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to open ledger: {}", e)))?;
-    
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS secrets (
-            id TEXT PRIMARY KEY,
-            source_file TEXT NOT NULL,
-            classification TEXT NOT NULL,
-            key_hash TEXT NOT NULL,
-            discovered_at TEXT NOT NULL,
-            keyring_ref TEXT NOT NULL
-        )",
-        []
-    );
-    let _ = conn.execute(
-        "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
-            id TEXT PRIMARY KEY,
-            raw_value TEXT NOT NULL,
-            filepath TEXT NOT NULL,
-            status TEXT NOT NULL
-        )",
-        []
-    );
     let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
 
     let scanner = SentinelScanner::new(vec![], keyring, ledger);

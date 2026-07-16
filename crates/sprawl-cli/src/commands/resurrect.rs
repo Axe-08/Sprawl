@@ -68,7 +68,7 @@ pub fn handle(args: &ResurrectArgs, is_json: bool) -> Result<()> {
                 if copied_to_clipboard {
                     println!("📋 Copied bootstrap command to clipboard!");
                 } else {
-                    println!("⚠️ Could not copy to clipboard. Bootstrap command: {}", cmd);
+                    println!("💡 Bootstrap command: {}", cmd);
                 }
             }
         }

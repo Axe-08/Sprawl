@@ -23,6 +23,7 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 id              TEXT PRIMARY KEY,
                 root_path       TEXT NOT NULL UNIQUE,
                 ecosystem       TEXT,
+                status          TEXT NOT NULL DEFAULT 'active',
                 last_seen       TEXT NOT NULL,
                 idle_days       INTEGER DEFAULT 0,
                 stack_source    TEXT,
@@ -42,6 +43,13 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 discovered_at   TEXT NOT NULL,
                 verified_at     TEXT,
                 verified_status TEXT
+            );
+            CREATE TABLE ambiguous_secrets (
+                id TEXT PRIMARY KEY,
+                raw_value TEXT NOT NULL,
+                filepath TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_at TEXT
             );
             CREATE TABLE sweep_history (
                 id              TEXT PRIMARY KEY,

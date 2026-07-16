@@ -17,7 +17,7 @@ pub enum SprawlError {
     #[error("Safety Gate vetoed operation: {0}")]
     SafetyVeto(String),
 
-    #[error("Unknown error: {0}")]
+    #[error("{0}")]
     Other(String),
 }
 

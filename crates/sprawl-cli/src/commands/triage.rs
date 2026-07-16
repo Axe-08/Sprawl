@@ -91,9 +91,13 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 println!("Attempting to nuke {}...", project);
             }
             
-            let path = PathBuf::from(project);
+            let path = PathBuf::from(&project);
             if !path.exists() {
                 if !is_json { println!("Error: path does not exist."); }
+                std::process::exit(1);
+            }
+            if let Err(e) = validate_triage_path(&path) {
+                if !is_json { println!("Error: {}", e); }
                 std::process::exit(1);
             }
 
@@ -136,9 +140,13 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 println!("Attempting to archive {}...", project);
             }
 
-            let path = PathBuf::from(project);
+            let path = PathBuf::from(&project);
             if !path.exists() {
                 if !is_json { println!("Error: path does not exist."); }
+                std::process::exit(1);
+            }
+            if let Err(e) = validate_triage_path(&path) {
+                if !is_json { println!("Error: {}", e); }
                 std::process::exit(1);
             }
 
@@ -178,9 +186,13 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
                 println!("Attempting to snooze {}...", project);
             }
 
-            let path = PathBuf::from(project);
+            let path = PathBuf::from(&project);
             if !path.exists() {
                 if !is_json { println!("Error: path does not exist."); }
+                std::process::exit(1);
+            }
+            if let Err(e) = validate_triage_path(&path) {
+                if !is_json { println!("Error: {}", e); }
                 std::process::exit(1);
             }
 
@@ -253,3 +265,28 @@ fn get_directory_metadata(path: &std::path::Path) -> (u64, i64) {
 
     (total_size, idle_days)
 }
+
+fn validate_triage_path(path: &std::path::Path) -> sprawl_core::Result<()> {
+    let candidate_patterns = ["node_modules", "dist", "target", ".venv", "__pycache__", ".next", "build"];
+    let file_name = path.file_name().unwrap_or_default().to_string_lossy();
+    if !candidate_patterns.contains(&file_name.as_ref()) {
+        return Err(sprawl_core::SprawlError::Other(format!("Path '{}' does not match any noisy directory pattern", path.display())));
+    }
+    
+    // Check if parent is a registered project
+    if let Some(parent) = path.parent() {
+        if let Ok(ledger_path) = sprawl_core::platform::sprawl_data_dir().map(|d| d.join("ledger.sqlite")) {
+            if let Ok(conn) = sprawl_core::ledger::initialize_db(&ledger_path) {
+                let parent_str = parent.canonicalize().unwrap_or_else(|_| parent.to_path_buf()).to_string_lossy().to_string();
+                let mut stmt = conn.prepare("SELECT count(*) FROM projects WHERE root_path = ?")
+                    .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                let count: i64 = stmt.query_row([&parent_str], |r| r.get(0)).unwrap_or(0);
+                if count > 0 {
+                    return Ok(());
+                }
+            }
+        }
+    }
+    Err(sprawl_core::SprawlError::Other(format!("Path '{}' is not within a registered project", path.display())))
+}
+

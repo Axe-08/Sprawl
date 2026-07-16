@@ -198,18 +198,64 @@ impl Archivist {
                     continue;
                 }
 
-                // Normal indexing work here...
-                // Example of wiring logic for Phase 2:
-                // 1. Scan projects for changed files
-                // 2. Chunk files using Archivist::chunk_file
-                // 3. embedder_clone.embed(&texts)
-                // 4. Build IndexedChunk objects
-                // 5. Build tokio runtime or block_on to insert:
-                // tokio::runtime::Handle::current().block_on(async {
-                //     db_clone.insert(&chunks).await.ok();
-                // });
+                let db_clone = _db_clone.clone();
+                let embedder_clone = _embedder_clone.clone();
 
-                std::thread::sleep(Duration::from_millis(10)); // normally 300s
+                if let Ok(ledger_path) = sprawl_core::platform::sprawl_data_dir().map(|d| d.join("ledger.sqlite")) {
+                    if let Ok(conn) = sprawl_core::ledger::initialize_db(&ledger_path) {
+                        if let Ok(mut stmt) = conn.prepare("SELECT id, root_path FROM projects WHERE status = 'active'") {
+                            if let Ok(projects) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))) {
+                                for proj_res in projects.flatten() {
+                                    let (proj_id, root) = proj_res;
+                                    let root_path = std::path::PathBuf::from(root);
+                                    
+                                    // Walk just the first few files to avoid a huge initial burst
+                                    if let Ok(entries) = std::fs::read_dir(&root_path) {
+                                        for entry in entries.flatten().take(5) {
+                                            if let Ok(file_type) = entry.file_type() {
+                                                if file_type.is_file() {
+                                                    let path = entry.path();
+                                                    if let Some(ext) = path.extension() {
+                                                        if ext == "rs" || ext == "js" || ext == "py" {
+                                                            if let Ok(chunks) = Self::chunk_file(&path) {
+                                                                let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();
+                                                                if let Ok(embeddings) = embedder_clone.embed(&texts) {
+                                                                    let mut indexed = Vec::new();
+                                                                    for (i, c) in chunks.into_iter().enumerate() {
+                                                                        indexed.push(IndexedChunk {
+                                                                            id: uuid::Uuid::new_v4().to_string(),
+                                                                            project_id: proj_id.clone(),
+                                                                            file_path: path.strip_prefix(&root_path).unwrap_or(&path).to_string_lossy().into_owned(),
+                                                                            chunk_text: c.text,
+                                                                            chunk_start_line: c.start_line,
+                                                                            chunk_end_line: c.end_line,
+                                                                            embedding: embeddings.get(i).cloned().unwrap_or_else(|| vec![0.0; 384]),
+                                                                            indexed_at: chrono::Utc::now().to_rfc3339(),
+                                                                        });
+                                                                    }
+                                                                    
+                                                                    tokio::runtime::Builder::new_current_thread()
+                                                                        .enable_all()
+                                                                        .build()
+                                                                        .unwrap()
+                                                                        .block_on(async {
+                                                                            db_clone.insert(&indexed).await.ok();
+                                                                        });
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                std::thread::sleep(Duration::from_millis(300)); // Short for testing normally 300s
             }
         });
 

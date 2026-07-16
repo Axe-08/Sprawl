@@ -37,4 +37,4 @@ sprawl-dev = { path = "../sprawl-dev" }
 [features]
 default = []
 mock-backend = []
-real-archivist = ["lancedb", "arrow", "arrow-array", "arrow-schema", "futures", "candle-core", "candle-nn", "candle-transformers", "tokenizers", "reqwest"]
+real-archivist = ["dep:lancedb", "dep:arrow", "dep:arrow-array", "dep:arrow-schema", "dep:futures", "dep:candle-core", "dep:candle-nn", "dep:candle-transformers", "dep:tokenizers", "dep:reqwest"]

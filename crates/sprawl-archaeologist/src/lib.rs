@@ -56,17 +56,6 @@ impl Archaeologist {
 
         if let Some(conn_mu) = &self.db_conn {
             let conn = conn_mu.lock().unwrap();
-            let _ = conn.execute(
-                "CREATE TABLE IF NOT EXISTS projects (
-                    id TEXT PRIMARY KEY,
-                    root_path TEXT UNIQUE NOT NULL,
-                    ecosystem TEXT,
-                    status TEXT NOT NULL DEFAULT 'active',
-                    last_seen TEXT,
-                    created_at TEXT
-                )",
-                []
-            );
         }
 
         for root in roots {

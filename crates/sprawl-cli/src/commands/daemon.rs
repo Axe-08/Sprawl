@@ -65,27 +65,7 @@ pub async fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                 let _sentinel_data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("sentinel");
                 let keyring = Box::new(sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store"));
                 let ledger_path = std::path::PathBuf::from(&home).join(".sprawl").join("ledger.sqlite");
-                let conn = rusqlite::Connection::open(&ledger_path).expect("Failed to open ledger");
-                let _ = conn.execute(
-                    "CREATE TABLE IF NOT EXISTS secrets (
-                        id TEXT PRIMARY KEY,
-                        source_file TEXT NOT NULL,
-                        classification TEXT NOT NULL,
-                        key_hash TEXT NOT NULL,
-                        discovered_at TEXT NOT NULL,
-                        keyring_ref TEXT NOT NULL
-                    )",
-                    []
-                );
-                let _ = conn.execute(
-                    "CREATE TABLE IF NOT EXISTS ambiguous_secrets (
-                        id TEXT PRIMARY KEY,
-                        raw_value TEXT NOT NULL,
-                        filepath TEXT NOT NULL,
-                        status TEXT NOT NULL
-                    )",
-                    []
-                );
+                let conn = sprawl_core::ledger::initialize_db(&ledger_path).expect("Failed to open and initialize ledger");
                 let ledger = Box::new(sprawl_sentinel::scanner::SqliteLedgerStore::new(conn));
                 
                 let sentinel = std::sync::Arc::new(sprawl_sentinel::scanner::SentinelScanner::new(vec![], keyring, ledger));

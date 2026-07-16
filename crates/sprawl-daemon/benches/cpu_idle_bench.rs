@@ -20,7 +20,7 @@ fn bench_idle_cpu(c: &mut Criterion) {
                 0.0
             };
             // Verify that the retrieved value is valid (non-negative)
-            assert!(cpu_usage >= 0.0, "CPU usage must be non-negative");
+            assert!(cpu_usage >= 0.0 && cpu_usage < 5.0, "Idle CPU usage must be below 5.0%, got {}", cpu_usage);
         });
     });
     
