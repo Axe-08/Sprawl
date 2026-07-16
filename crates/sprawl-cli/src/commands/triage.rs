@@ -42,8 +42,8 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
             if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
                 if let Ok(mut stmt) = conn.prepare("SELECT root_path FROM projects") {
                     let roots: Vec<String> = stmt.query_map([], |r| r.get(0))
-                        .unwrap_or_else(|_| Box::new(std::iter::empty()))
-                        .flatten().collect();
+                        .map(|m| m.flatten().collect())
+                        .unwrap_or_default();
                     for root in roots {
                         for pattern in &candidate_patterns {
                             let candidate = std::path::PathBuf::from(&root).join(pattern);

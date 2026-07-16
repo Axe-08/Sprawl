@@ -52,7 +52,7 @@ pub fn handle(args: &SimulateRevokeArgs, is_json: bool) -> Result<()> {
     // has_keyring: check OS keyring
     let has_keyring = {
         let store = sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store");
-        store.get(&args.key).is_some()
+        store.has_secret(&args.key)
     };
 
     if is_json {

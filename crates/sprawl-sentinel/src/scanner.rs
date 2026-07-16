@@ -25,6 +25,14 @@ impl OsKeyringStore {
             service_name: service_name.to_string(),
         }
     }
+
+    pub fn has_secret(&self, id: &str) -> bool {
+        if let Ok(entry) = keyring::Entry::new(&self.service_name, id) {
+            entry.get_password().is_ok()
+        } else {
+            false
+        }
+    }
 }
 
 impl KeyringBackend for OsKeyringStore {

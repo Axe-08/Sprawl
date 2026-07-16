@@ -350,7 +350,8 @@ mod tests {
         archivist.start_background_indexer(LowRamMonitor).unwrap();
 
         // Wait for thread to complete its limited test iterations
-        if let Some(handle) = archivist.indexer_handle.lock().unwrap().take() {
+        let handle_opt = archivist.indexer_handle.lock().unwrap().take();
+        if let Some(handle) = handle_opt {
             handle.join().unwrap();
         }
         // If it joins successfully and didn't panic, it properly suspended and looped
