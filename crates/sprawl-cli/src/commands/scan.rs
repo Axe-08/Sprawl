@@ -74,8 +74,11 @@ pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
         }
 
         if let Ok(contents) = std::fs::read_to_string(path) {
-            let relative_path = path.strip_prefix(&args.dir).unwrap_or(path);
-            let display_path = relative_path.to_string_lossy().replace("\\", "/");
+            let display_path = if args.dir.is_file() {
+                args.dir.to_string_lossy().replace("\\", "/")
+            } else {
+                path.strip_prefix(&args.dir).unwrap_or(path).to_string_lossy().replace("\\", "/")
+            };
 
             for (line_idx, line) in contents.lines().enumerate() {
                 let tokens: Vec<&str> = line.split(|c: char| c.is_whitespace() || c == '=' || c == '"' || c == '\'').collect();

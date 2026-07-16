@@ -11,6 +11,7 @@ pub enum IpcRequest {
     SentinelAccept { id: uuid::Uuid },
     SentinelReject { id: uuid::Uuid },
     BatchClassify { secrets: Vec<sprawl_sentinel::llm::DiscoveredSecret> },
+    StartIndexer,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]

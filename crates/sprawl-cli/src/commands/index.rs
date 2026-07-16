@@ -16,24 +16,21 @@ pub async fn handle(args: &IndexArgs, _is_json: bool) -> Result<()> {
         return Ok(());
     }
 
-    let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
-    #[allow(unused_variables)]
-    let data_dir = PathBuf::from(home).join(".sprawl").join("archivist");
-
-    #[cfg(feature = "real-archivist")]
-    let mut archivist = Archivist::new_real(&data_dir).await.map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
-    
-    #[cfg(not(feature = "real-archivist"))]
-    let mut archivist = Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder));
-
-    println!("Starting background indexer...");
-    archivist.start_background_indexer(SysRamMonitor).map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
-    
-    if let Some(handle) = archivist.indexer_handle.take() {
-        // Wait for it to finish its indexing pass if we started it explicitly
-        let _ = handle.join();
-        println!("Indexing complete.");
+    if let Ok(client) = sprawl_daemon::IpcClient::new() {
+        if let Ok(resp) = client.send_request(&sprawl_daemon::IpcRequest::StartIndexer).await {
+            match resp {
+                sprawl_daemon::IpcResponse::Ok => println!("Indexer started by daemon."),
+                sprawl_daemon::IpcResponse::Error(e) => {
+                    return Err(sprawl_core::SprawlError::Other(format!("Daemon error: {}", e)));
+                }
+                _ => println!("Indexer signal sent."),
+            }
+        } else {
+            println!("Daemon not running. Start it first with: sprawl daemon start");
+        }
+    } else {
+        println!("Could not connect to daemon. Start it first with: sprawl daemon start");
     }
-    
+
     Ok(())
 }

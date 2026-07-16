@@ -77,6 +77,12 @@ pub async fn run_daemon_loop(
                                                 Err(e) => IpcResponse::Error(e.to_string()),
                                             }
                                         }
+                                        IpcRequest::StartIndexer => {
+                                            match archivist_clone.start_background_indexer(sprawl_archivist::SysRamMonitor) {
+                                                Ok(_) => IpcResponse::Ok,
+                                                Err(e) => IpcResponse::Error(e.to_string()),
+                                            }
+                                        }
                                     };
                                     
                                     if let Ok(resp_json) = serde_json::to_string(&resp) {

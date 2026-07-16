@@ -22,19 +22,38 @@ pub fn handle(args: &SimulateRevokeArgs, is_json: bool) -> Result<()> {
         }
     };
 
-    // In M18 we just simulate success if it parses
-    let has_keyring = true;
-    let record_found = true;
+    let data_dir = sprawl_core::platform::sprawl_data_dir()?;
+    let ledger_path = data_dir.join("ledger.sqlite");
+
+    let (record_found, _is_encrypted) = if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+        let result = conn.query_row(
+            "SELECT classification FROM secrets WHERE id = ?1",
+            [&args.key],
+            |row| row.get::<_, String>(0),
+        );
+        match result {
+            Ok(_classification) => (true, true), // ledger entries are always encrypted
+            Err(rusqlite::Error::QueryReturnedNoRows) => (false, false),
+            Err(_) => (false, false),
+        }
+    } else {
+        (false, false)
+    };
 
     if !record_found {
         if is_json {
             println!("{}", serde_json::json!({"status": "error", "message": "Secret not found in ledger"}));
         } else {
-            println!("Simulating revocation for key {}...", args.key);
-            println!("Error: Secret not found in ledger");
+            println!("Error: Secret '{}' not found in ledger.", args.key);
         }
         std::process::exit(6);
     }
+
+    // has_keyring: check OS keyring
+    let has_keyring = {
+        let store = sprawl_sentinel::scanner::OsKeyringStore::new("sprawl-secret-store");
+        store.get(&args.key).is_some()
+    };
 
     if is_json {
         println!(

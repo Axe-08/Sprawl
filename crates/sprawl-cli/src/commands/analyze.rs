@@ -15,6 +15,18 @@ pub struct AnalyzeArgs {
 }
 
 pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
+    if !args.dir.exists() {
+        return Err(sprawl_core::SprawlError::Other(format!(
+            "'{}' does not exist", args.dir.display()
+        )));
+    }
+    if !args.dir.is_dir() {
+        return Err(sprawl_core::SprawlError::Other(format!(
+            "'{}' is a file. `sprawl analyze` requires a project directory.\nTo scan a file for secrets, use: sprawl scan {}",
+            args.dir.display(), args.dir.display()
+        )));
+    }
+
     if args.deep {
         if !is_json {
             println!("Initializing Inference Engine...");

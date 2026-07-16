@@ -167,12 +167,12 @@ impl Bundler {
                                 };
 
                             let file_str = format!(
-                                "\\n--- {} ---\\n```\\n{}\\n```\\n",
+                                "\n--- {} ---\n```\n{}\n```\n",
                                 rel_path, processed_content
                             );
 
                             // Rough token estimate: ~4 chars per token
-                            let file_tokens = file_str.len() / 4;
+                            let file_tokens = processed_content.len() / 4;
                             if estimated_tokens + file_tokens > opts.max_tokens
                                 && !all_files_content.is_empty()
                             {
