@@ -2,7 +2,6 @@ use clap::Args;
 use sprawl_core::Result;
 use sprawl_sentinel::scanner::SentinelScanner;
 use std::path::PathBuf;
-use std::fs;
 
 #[derive(Args)]
 pub struct ScanArgs {

@@ -1,7 +1,5 @@
 use clap::Args;
-use sprawl_archivist::{Archivist, SysRamMonitor};
 use sprawl_core::Result;
-use std::path::PathBuf;
 
 #[derive(Args)]
 pub struct IndexArgs {
