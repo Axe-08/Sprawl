@@ -111,6 +111,33 @@ pub async fn handle(args: &AnalyzeArgs, is_json: bool) -> Result<()> {
 
         match arch.detect_stack(&args.dir).await {
             Ok((Some(primary), _)) => {
+                if let Ok(ledger_path) = sprawl_core::platform::sprawl_data_dir().map(|d| d.join("ledger.sqlite")) {
+                    if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+                        let _ = conn.execute(
+                            "CREATE TABLE IF NOT EXISTS projects (
+                                id TEXT PRIMARY KEY,
+                                root_path TEXT UNIQUE NOT NULL,
+                                ecosystem TEXT,
+                                status TEXT NOT NULL DEFAULT 'active',
+                                last_seen TEXT,
+                                created_at TEXT
+                            )", []
+                        );
+                        let now = chrono::Utc::now().to_rfc3339();
+                        let _ = conn.execute(
+                            "INSERT INTO projects (id, root_path, ecosystem, last_seen, created_at)
+                             VALUES (?1, ?2, ?3, ?4, ?4)
+                             ON CONFLICT(root_path) DO UPDATE SET last_seen=excluded.last_seen, ecosystem=excluded.ecosystem",
+                            (
+                                uuid::Uuid::new_v4().to_string(),
+                                args.dir.canonicalize().unwrap_or_else(|_| args.dir.clone()).to_string_lossy().to_string(),
+                                &primary.ecosystem,
+                                &now,
+                            )
+                        );
+                    }
+                }
+
                 if is_json {
                     println!(
                         "{}",

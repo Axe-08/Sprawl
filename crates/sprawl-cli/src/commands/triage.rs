@@ -27,21 +27,58 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
 
     match &args.command {
         TriageCommand::List => {
-            // For MVP/M18, this lists dummy/stub data similar to SweeperInboxState in TUI.
+            let data_dir = sprawl_core::platform::sprawl_data_dir()?;
+            let ledger_path = data_dir.join("ledger.sqlite");
+            
+            struct TriageCandidate {
+                project: String,
+                idle_days: i64,
+                size_bytes: u64,
+                status: &'static str,
+            }
+            let mut items = Vec::new();
+
+            let candidate_patterns = ["node_modules", "dist", "target", ".venv", "__pycache__", ".next", "build"];
+            if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+                if let Ok(mut stmt) = conn.prepare("SELECT root_path FROM projects") {
+                    let roots: Vec<String> = stmt.query_map([], |r| r.get(0))
+                        .unwrap_or_else(|_| Box::new(std::iter::empty()))
+                        .flatten().collect();
+                    for root in roots {
+                        for pattern in &candidate_patterns {
+                            let candidate = std::path::PathBuf::from(&root).join(pattern);
+                            if candidate.exists() {
+                                let (size_bytes, idle_days) = get_directory_metadata(&candidate);
+                                let status = if idle_days > 30 { "[X] nuke-eligible" } else { "[?] ambiguous" };
+                                items.push(TriageCandidate {
+                                    project: format!("{}/{}", std::path::PathBuf::from(&root).file_name().unwrap_or_default().to_string_lossy(), pattern),
+                                    idle_days,
+                                    size_bytes,
+                                    status,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+
+            if items.is_empty() {
+                if !is_json { println!("No triage candidates found. Run `sprawl analyze <dir>` to register projects."); }
+                return Ok(());
+            }
+
             if is_json {
-                println!(
-                    "{}",
-                    serde_json::json!({
-                        "items": [
-                            {"project": "old-api/node_modules", "last_seen": "45d ago", "size": "387MB", "status": "[X] nuke-eligible"},
-                            {"project": "web-app/dist", "last_seen": "12d ago", "size": "52MB", "status": "[?] ambiguous"}
-                        ]
-                    })
-                );
+                println!("{}", serde_json::json!({"items": items.iter().map(|m| serde_json::json!({
+                    "project": m.project,
+                    "last_seen": format!("{}d ago", m.idle_days),
+                    "size": format!("{}MB", m.size_bytes / 1_000_000),
+                    "status": m.status
+                })).collect::<Vec<_>>()}));
             } else {
-                println!("{:<22} {:<12} {:<9} {}", "PROJECT", "LAST SEEN", "SIZE", "STATUS");
-                println!("{:<22} {:<12} {:<9} {}", "old-api/node_modules", "45d ago", "387MB", "[X] nuke-eligible");
-                println!("{:<22} {:<12} {:<9} {}", "web-app/dist", "12d ago", "52MB", "[?] ambiguous");
+                println!("{:<30} {:<12} {:<9} {}", "PROJECT", "LAST SEEN", "SIZE", "STATUS");
+                for item in items {
+                    println!("{:<30} {:<12} {:<9} {}", item.project, format!("{}d ago", item.idle_days), format!("{}MB", item.size_bytes / 1_000_000), item.status);
+                }
             }
         }
         TriageCommand::Nuke { project } => {

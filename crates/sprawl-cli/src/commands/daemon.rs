@@ -148,8 +148,10 @@ pub async fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             } else {
                 if is_running {
                     println!("Daemon is running.");
+                    std::process::exit(0);
                 } else {
                     println!("Daemon not running.");
+                    std::process::exit(1);
                 }
             }
         }

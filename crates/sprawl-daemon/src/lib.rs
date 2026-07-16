@@ -30,12 +30,14 @@ pub async fn run_daemon_loop(
     tokio::spawn({
         let archivist = archivist.clone();
         let sentinel = sentinel.clone();
+        let start_time = start_time;
         async move {
             loop {
                 match listener.accept().await {
                     Ok((mut socket, _addr)) => {
                         let archivist_clone = archivist.clone();
-                        let _sentinel_clone = sentinel.clone();
+                        let sentinel_clone = sentinel.clone();
+                        let start_time = start_time;
                         tokio::spawn(async move {
                             use tokio::io::{AsyncReadExt, AsyncWriteExt};
                             let mut buf = vec![0; 1024 * 1024]; // 1MB buffer
@@ -56,14 +58,14 @@ pub async fn run_daemon_loop(
                                             }
                                         }
                                         IpcRequest::GetSentinelInbox => {
-                                            IpcResponse::SentinelInbox(_sentinel_clone.get_ambiguous_secrets())
+                                            IpcResponse::SentinelInbox(sentinel_clone.get_ambiguous_secrets())
                                         }
                                         IpcRequest::SentinelAccept { id } => {
-                                            _sentinel_clone.mark_accepted(id);
+                                            sentinel_clone.mark_accepted(id);
                                             IpcResponse::Ok
                                         }
                                         IpcRequest::SentinelReject { id } => {
-                                            _sentinel_clone.mark_rejected(id);
+                                            sentinel_clone.mark_rejected(id);
                                             IpcResponse::Ok
                                         }
                                         IpcRequest::BatchClassify { secrets } => {
