@@ -54,10 +54,6 @@ impl Archaeologist {
     pub async fn scan_projects(&self, roots: &[PathBuf]) -> Result<ScanReport> {
         let mut report = ScanReport::default();
 
-        if let Some(conn_mu) = &self.db_conn {
-            let conn = conn_mu.lock().unwrap();
-        }
-
         for root in roots {
             let (primary, _all_matches) = self.detect_stack(root).await?;
 

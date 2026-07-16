@@ -45,7 +45,7 @@ pub async fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
                 #[cfg(not(feature = "real-archivist"))]
                 let archivist_result: sprawl_archivist::Result<_> = Ok(sprawl_archivist::Archivist::new(std::sync::Arc::new(sprawl_dev::MockDatabase), std::sync::Arc::new(sprawl_dev::MockEmbedder)));
                 
-                let mut archivist = match archivist_result {
+                let archivist = match archivist_result {
                     Ok(a) => a,
                     Err(e) => {
                         tracing::error!("Failed to init archivist: {}", e);

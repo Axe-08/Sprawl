@@ -65,8 +65,8 @@ pub async fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
             let candidate_patterns = ["node_modules", "dist", "target", ".venv", "__pycache__", ".next", "build"];
             if let Ok(mut stmt) = conn.prepare("SELECT root_path FROM projects") {
                 let roots: Vec<String> = stmt.query_map([], |r| r.get(0))
-                    .unwrap_or_else(|_| Box::new(std::iter::empty()))
-                    .flatten().collect();
+                    .map(|mapped| mapped.flatten().collect())
+                    .unwrap_or_default();
                 for root in roots {
                     for pattern in candidate_patterns {
                         let candidate = std::path::PathBuf::from(&root).join(pattern);

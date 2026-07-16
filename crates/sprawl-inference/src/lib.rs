@@ -331,7 +331,7 @@ impl<S: SysInfo> InferenceEngine<S> {
     pub async fn run_prompt(&mut self, prompt: &str) -> Result<String> {
         self.state = InferenceStatus::Running;
 
-        #[cfg(any(test, feature = "mock-backend"))]
+        #[cfg(all(any(test, feature = "mock-backend"), not(feature = "real-inference")))]
         let response = if prompt.contains("JSON") && prompt.contains("classification") {
             r#"{"classification": "likely_noise", "reason": "mock noise"}"#.to_string()
         } else if prompt.contains("JSON") {

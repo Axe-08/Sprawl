@@ -76,7 +76,7 @@ pub trait VectorDatabase: Send + Sync {
 pub struct Archivist {
     db: std::sync::Arc<dyn VectorDatabase>,
     embedder: std::sync::Arc<dyn Embedder>,
-    pub indexer_handle: Option<JoinHandle<()>>,
+    pub indexer_handle: std::sync::Mutex<Option<JoinHandle<()>>>,
 }
 
 impl Archivist {
@@ -95,7 +95,7 @@ impl Archivist {
         Ok(Self {
             db: std::sync::Arc::new(db),
             embedder: std::sync::Arc::new(embedder),
-            indexer_handle: None,
+            indexer_handle: std::sync::Mutex::new(None),
         })
     }
 
@@ -103,7 +103,7 @@ impl Archivist {
         Self {
             db,
             embedder,
-            indexer_handle: None,
+            indexer_handle: std::sync::Mutex::new(None),
         }
     }
 
@@ -171,7 +171,7 @@ impl Archivist {
         Ok(chunks)
     }
 
-    pub fn start_background_indexer<R: RamMonitor + 'static>(&mut self, monitor: R) -> Result<()> {
+    pub fn start_background_indexer<R: RamMonitor + 'static>(&self, monitor: R) -> Result<()> {
         let _db_clone = self.db.clone();
         let _embedder_clone = self.embedder.clone();
 
@@ -259,7 +259,10 @@ impl Archivist {
             }
         });
 
-        self.indexer_handle = Some(handle);
+        if let Ok(mut handle_guard) = self.indexer_handle.lock() {
+            *handle_guard = Some(handle);
+        }
+        
         Ok(())
     }
 
@@ -347,7 +350,7 @@ mod tests {
         archivist.start_background_indexer(LowRamMonitor).unwrap();
 
         // Wait for thread to complete its limited test iterations
-        if let Some(handle) = archivist.indexer_handle.take() {
+        if let Some(handle) = archivist.indexer_handle.lock().unwrap().take() {
             handle.join().unwrap();
         }
         // If it joins successfully and didn't panic, it properly suspended and looped
