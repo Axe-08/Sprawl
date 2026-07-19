@@ -15,11 +15,13 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
         .pragma_query_value(None, "user_version", |row| row.get(0))
         .map_err(|e| crate::SprawlError::Other(format!("Failed to read user_version: {}", e)))?;
 
-    if user_version == 0 {
-        // Initial setup
+    // Check if schema needs to be created or migrated.
+    // We always use IF NOT EXISTS to be safe against partially-initialized databases
+    // (e.g. where other code paths created tables outside the versioned schema path).
+    if user_version < CURRENT_SCHEMA_VERSION {
         conn.execute_batch(
             "
-            CREATE TABLE projects (
+            CREATE TABLE IF NOT EXISTS projects (
                 id              TEXT PRIMARY KEY,
                 root_path       TEXT NOT NULL UNIQUE,
                 ecosystem       TEXT,
@@ -30,7 +32,7 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 config_source   TEXT,
                 created_at      TEXT NOT NULL
             );
-            CREATE TABLE secrets (
+            CREATE TABLE IF NOT EXISTS secrets (
                 id              TEXT PRIMARY KEY,
                 project_id      TEXT REFERENCES projects(id),
                 source_file     TEXT NOT NULL,
@@ -44,14 +46,14 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 verified_at     TEXT,
                 verified_status TEXT
             );
-            CREATE TABLE ambiguous_secrets (
+            CREATE TABLE IF NOT EXISTS ambiguous_secrets (
                 id TEXT PRIMARY KEY,
                 raw_value TEXT NOT NULL,
                 filepath TEXT NOT NULL,
                 status TEXT NOT NULL DEFAULT 'pending',
                 reviewed_at TEXT
             );
-            CREATE TABLE sweep_history (
+            CREATE TABLE IF NOT EXISTS sweep_history (
                 id              TEXT PRIMARY KEY,
                 project_id      TEXT REFERENCES projects(id),
                 target_path     TEXT NOT NULL,
@@ -61,11 +63,11 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
                 executed_at     TEXT NOT NULL,
                 restored_at     TEXT
             );
-            CREATE TABLE schema_meta (
+            CREATE TABLE IF NOT EXISTS schema_meta (
                 key   TEXT PRIMARY KEY,
                 value TEXT NOT NULL
             );
-            INSERT INTO schema_meta VALUES ('schema_version', '1');
+            INSERT OR IGNORE INTO schema_meta VALUES ('schema_version', '1');
             ",
         )
         .map_err(|e| crate::SprawlError::Other(format!("Failed to initialize schema: {}", e)))?;
@@ -74,9 +76,6 @@ pub fn initialize_db(db_path: &Path) -> crate::Result<Connection> {
             .map_err(|e| {
                 crate::SprawlError::Other(format!("Failed to update user_version: {}", e))
             })?;
-    } else if user_version < CURRENT_SCHEMA_VERSION {
-        // Here we would perform schema migration.
-        // As per Step 3.6: Always backup before migrate.
     }
 
     Ok(conn)

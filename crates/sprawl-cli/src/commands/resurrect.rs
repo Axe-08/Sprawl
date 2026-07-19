@@ -33,6 +33,35 @@ pub fn handle(args: &ResurrectArgs, is_json: bool) -> Result<()> {
         project_name
     ));
 
+    // Validate the archive actually exists before proceeding
+    if !archive_path.exists() {
+        let ledger_has_project = {
+            let data_dir = sprawl_core::platform::sprawl_data_dir()?;
+            let ledger_path = data_dir.join("ledger.sqlite");
+            if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+                conn.query_row(
+                    "SELECT 1 FROM projects WHERE root_path = ?1",
+                    [absolute_path.to_string_lossy().as_ref()],
+                    |_| Ok(true),
+                ).unwrap_or(false)
+            } else {
+                false
+            }
+        };
+
+        if !ledger_has_project {
+            if is_json {
+                println!("{}", serde_json::json!({
+                    "status": "error",
+                    "message": format!("Project '{}' not found in ledger or archive. Has it been swept by Sprawl?", args.project_path)
+                }));
+            } else {
+                eprintln!("Error: Project '{}' not found in ledger or archive. Has it been swept by Sprawl?", args.project_path);
+            }
+            std::process::exit(4);
+        }
+    }
+
     // Restore the files (mocked or real based on backend)
     match engine.restore(&target_path, &archive_path) {
         Ok(_) => {

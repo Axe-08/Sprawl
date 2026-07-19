@@ -63,7 +63,11 @@ pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
             }
 
             if items.is_empty() {
-                if !is_json { println!("No triage candidates found. Run `sprawl analyze <dir>` to register projects."); }
+                if is_json {
+                    println!("{}", serde_json::json!({"items": []}));
+                } else {
+                    println!("No triage candidates found. Run `sprawl analyze <dir>` to register projects.");
+                }
                 return Ok(());
             }
 

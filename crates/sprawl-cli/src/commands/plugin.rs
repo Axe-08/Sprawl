@@ -30,6 +30,14 @@ pub enum PluginAction {
     Remove { name: String },
     /// Update a plugin from a new local path
     Update { name: String, source: PathBuf },
+    /// Verify the Ed25519 signature of a .wasm plugin against its manifest
+    Verify {
+        /// Path to the .wasm plugin file
+        source: PathBuf,
+        /// Path to manifest.json containing the signature
+        #[arg(long)]
+        manifest: PathBuf,
+    },
 }
 
 pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
@@ -164,6 +172,46 @@ pub fn handle(args: &PluginArgs, is_json: bool) -> Result<()> {
 
             if !is_json {
                 println!("Successfully updated plugin '{}'", name);
+            }
+        }
+        PluginAction::Verify { source, manifest } => {
+            if !source.exists() {
+                return Err(sprawl_core::SprawlError::Other(
+                    format!("Plugin file does not exist: {}", source.display())
+                ));
+            }
+            if source.extension().and_then(|s| s.to_str()) != Some("wasm") {
+                return Err(sprawl_core::SprawlError::Other(
+                    "Only .wasm files are supported".into(),
+                ));
+            }
+
+            let manifest_str = std::fs::read_to_string(manifest)
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to read manifest: {}", e)))?;
+            let parsed: sprawl_plugin_host::verify::PluginManifest = serde_json::from_str(&manifest_str)
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to parse manifest: {}", e)))?;
+
+            let public_key_bytes = sprawl_plugin_host::verify::COMMUNITY_SIGNING_KEY;
+            let host = sprawl_plugin_host::PluginHost::new(false, Some(&public_key_bytes))
+                .map_err(|e| sprawl_core::SprawlError::Other(format!("Failed to init PluginHost: {}", e)))?;
+
+            let name = source.file_stem().unwrap().to_string_lossy().to_string();
+            match host.load_plugin(source, &name, Some(&parsed)) {
+                Ok(_) => {
+                    if is_json {
+                        println!("{}", serde_json::json!({"status": "ok", "plugin": name, "signature": "valid"}));
+                    } else {
+                        println!("✅ Plugin '{}' signature verified successfully.", name);
+                    }
+                }
+                Err(e) => {
+                    if is_json {
+                        println!("{}", serde_json::json!({"status": "error", "plugin": name, "error": e.to_string()}));
+                    } else {
+                        println!("❌ Plugin verification failed: {}", e);
+                    }
+                    std::process::exit(1);
+                }
             }
         }
     }

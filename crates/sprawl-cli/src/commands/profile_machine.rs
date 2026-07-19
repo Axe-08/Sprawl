@@ -75,5 +75,16 @@ pub fn handle(_args: &ProfileMachineArgs, is_json: bool) -> Result<()> {
         }
     }
 
+    if is_json {
+        println!("{}", serde_json::json!({
+            "persona": persona,
+            "detected_tools": detected_tools,
+            "patterns_file": patterns_path.display().to_string(),
+            "is_rust": is_rust,
+            "is_node": is_node,
+            "is_python": is_python
+        }));
+    }
+
     Ok(())
 }
