@@ -24,7 +24,7 @@ pub async fn handle(_args: &StatusArgs, is_json: bool) -> Result<()> {
             uptime = uptime_secs;
         }
         _ => {
-            daemon_running = false;
+            // daemon_running stays false (initialized above)
         }
     }
     // Determine backend features at compile time

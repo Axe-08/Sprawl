@@ -38,6 +38,7 @@ pub async fn handle(args: &DaemonArgs, is_json: bool) -> Result<()> {
             
             ctx.start(|| async move {
                 let home = std::env::var("HOME").unwrap_or_else(|_| ".".into());
+                #[allow(unused_variables)]
                 let data_dir = std::path::PathBuf::from(&home).join(".sprawl").join("archivist");
                 
                 #[cfg(feature = "real-archivist")]
