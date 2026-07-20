@@ -22,9 +22,11 @@ sprawl-archivist = { path = "../sprawl-archivist" }
 rusqlite = "0.31.0"
 
 [features]
-default = []
-mock-backend = ["sprawl-inference/mock-backend"]
+default = ["real"]
+mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend"]
+real = ["real-inference", "real-archivist"]
 real-inference = ["sprawl-inference/real-inference"]
+real-archivist = ["sprawl-archivist/real-archivist"]
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

@@ -52,6 +52,8 @@ pub enum Command {
     Resurrect(commands::resurrect::ResurrectArgs),
     /// Profile the machine to generate optimal Sprawl config
     ProfileMachine(commands::profile_machine::ProfileMachineArgs),
+    /// Manage inference models
+    Models(commands::models::ModelsArgs),
 }
 
 #[tokio::main]
@@ -84,6 +86,7 @@ async fn main() {
         Command::Index(args) => commands::index::handle(args, cli.json).await,
         Command::Resurrect(args) => commands::resurrect::handle(args, cli.json),
         Command::ProfileMachine(args) => commands::profile_machine::handle(args, cli.json),
+        Command::Models(args) => commands::models::handle(args, cli.json).await,
         Command::Ui => {
             if let Err(e) = sprawl_tui::run().await {
                 Err(sprawl_core::SprawlError::Other(format!("TUI Error: {}", e)))

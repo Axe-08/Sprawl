@@ -34,8 +34,9 @@ hex = "0.4.3"
 walkdir = "2.5.0"
 
 [features]
-default = []
+default = ["real"]
 mock-backend = ["sprawl-inference/mock-backend", "sprawl-archivist/mock-backend", "sprawl-daemon/mock-backend"]
 debug = ["mock-backend"]
+real = ["real-inference", "real-archivist", "sprawl-daemon/real"]
 real-inference = ["sprawl-inference/real-inference", "sprawl-daemon/real-inference"]
 real-archivist = ["sprawl-archivist/real-archivist"]

@@ -209,41 +209,40 @@ impl Archivist {
                                     let (proj_id, root) = proj_res;
                                     let root_path = std::path::PathBuf::from(root);
                                     
-                                    // Walk just the first few files to avoid a huge initial burst
-                                    if let Ok(entries) = std::fs::read_dir(&root_path) {
-                                        for entry in entries.flatten().take(5) {
-                                            if let Ok(file_type) = entry.file_type() {
-                                                if file_type.is_file() {
-                                                    let path = entry.path();
-                                                    if let Some(ext) = path.extension() {
-                                                        if ext == "rs" || ext == "js" || ext == "py" {
-                                                            if let Ok(chunks) = Self::chunk_file(&path) {
-                                                                let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();
-                                                                if let Ok(embeddings) = embedder_clone.embed(&texts) {
-                                                                    let mut indexed = Vec::new();
-                                                                    for (i, c) in chunks.into_iter().enumerate() {
-                                                                        indexed.push(IndexedChunk {
-                                                                            id: uuid::Uuid::new_v4().to_string(),
-                                                                            project_id: proj_id.clone(),
-                                                                            file_path: path.strip_prefix(&root_path).unwrap_or(&path).to_string_lossy().into_owned(),
-                                                                            chunk_text: c.text,
-                                                                            chunk_start_line: c.start_line,
-                                                                            chunk_end_line: c.end_line,
-                                                                            embedding: embeddings.get(i).cloned().unwrap_or_else(|| vec![0.0; 384]),
-                                                                            indexed_at: chrono::Utc::now().to_rfc3339(),
-                                                                        });
-                                                                    }
-                                                                    
-                                                                    tokio::runtime::Builder::new_current_thread()
-                                                                        .enable_all()
-                                                                        .build()
-                                                                        .unwrap()
-                                                                        .block_on(async {
-                                                                            db_clone.insert(&indexed).await.ok();
-                                                                        });
-                                                                }
-                                                            }
+                                    use walkdir::WalkDir;
+                                    
+                                    for entry in WalkDir::new(&root_path)
+                                        .into_iter()
+                                        .filter_map(|e| e.ok())
+                                        .filter(|e| e.file_type().is_file())
+                                    {
+                                        let path = entry.path();
+                                        if let Some(ext) = path.extension() {
+                                            if ext == "rs" || ext == "js" || ext == "py" || ext == "md" || ext == "toml" || ext == "json" || ext == "c" || ext == "cpp" || ext == "h" || ext == "go" {
+                                                if let Ok(chunks) = Self::chunk_file(&path) {
+                                                    let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();
+                                                    if let Ok(embeddings) = embedder_clone.embed(&texts) {
+                                                        let mut indexed = Vec::new();
+                                                        for (i, c) in chunks.into_iter().enumerate() {
+                                                            indexed.push(IndexedChunk {
+                                                                id: uuid::Uuid::new_v4().to_string(),
+                                                                project_id: proj_id.clone(),
+                                                                file_path: path.strip_prefix(&root_path).unwrap_or(&path).to_string_lossy().into_owned(),
+                                                                chunk_text: c.text,
+                                                                chunk_start_line: c.start_line,
+                                                                chunk_end_line: c.end_line,
+                                                                embedding: embeddings.get(i).cloned().unwrap_or_else(|| vec![0.0; 384]),
+                                                                indexed_at: chrono::Utc::now().to_rfc3339(),
+                                                            });
                                                         }
+                                                        
+                                                        tokio::runtime::Builder::new_current_thread()
+                                                            .enable_all()
+                                                            .build()
+                                                            .unwrap()
+                                                            .block_on(async {
+                                                                db_clone.insert(&indexed).await.ok();
+                                                            });
                                                     }
                                                 }
                                             }

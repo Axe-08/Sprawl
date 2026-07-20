@@ -1,0 +1,303 @@
+=== STEP 0 ===
+ls: cannot access '/home/akshit/Projects/Sprawl/target/release/sprawl-cli': No such file or directory
+  --> crates/sprawl-cli/src/commands/daemon.rs:41:21
+   |
+41 |                 let data_dir = std::path::PathBuf::from(&home).join(".sp...
+   |                     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_data_dir`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: value assigned to `daemon_running` is never read
+  --> crates/sprawl-cli/src/commands/status.rs:8:30
+   |
+ 8 |     let mut daemon_running = false;
+   |                              ^^^^^ this value is reassigned later and never used
+...
+22 |             daemon_running = true;
+   |             --------------------- `daemon_running` is overwritten here before the previous value is read
+   |
+   = note: `#[warn(unused_assignments)]` (part of `#[warn(unused)]`) on by default
+
+warning: `sprawl-cli` (bin "sprawl-cli") generated 2 warnings (run `cargo fix --bin "sprawl-cli" -p sprawl-cli` to apply 1 suggestion)
+    Finished `release` profile [optimized] target(s) in 1m 22s
+=== STEP 1 ===
+Local-first codebase overseer
+
+Usage: sprawl-cli [OPTIONS] <COMMAND>
+
+Commands:
+  daemon           Control the background watcher daemon
+  plugin           Manage WASM plugins
+  restore          Reverse a Sweeper archive action
+  verify           Verify a vaulted secret via MCP network router
+  simulate-revoke  Simulate revoking a token to assess blast radius
+  bundle           Bundle a directory into a token-optimized markdown representation
+  analyze          Perform a deep analysis of a project using local LLM inference
+  ui               Start the Terminal UI
+  scan             Scan a directory for ambiguous secrets
+  search           Perform a semantic search via the Archivist
+  triage           Triage Sweeper inbox items
+  status           Display machine health and background task status
+  index            Explicitly control the Archivist background indexer
+  resurrect        Resurrect an archived project with a recovery kit
+  profile-machine  Profile the machine to generate optimal Sprawl config
+  help             Print this message or the help of the given subcommand(s)
+
+Options:
+  -v, --verbose  Enable verbose logging output
+      --json     Output results as JSON (for scripting)
+  -h, --help     Print help
+  -V, --version  Print version
+=== STEP 2 ===
+--- status ---
+Display machine health and background task status
+
+Usage: sprawl-cli status [OPTIONS]
+
+Options:
+--- daemon ---
+Control the background watcher daemon
+
+Usage: sprawl-cli daemon [OPTIONS] <COMMAND>
+
+Commands:
+--- analyze ---
+Perform a deep analysis of a project using local LLM inference
+
+Usage: sprawl-cli analyze [OPTIONS] <DIR>
+
+Arguments:
+--- scan ---
+Scan a directory for ambiguous secrets
+
+Usage: sprawl-cli scan [OPTIONS] [DIR]
+
+Arguments:
+--- triage ---
+Triage Sweeper inbox items
+
+Usage: sprawl-cli triage [OPTIONS] <COMMAND>
+
+Commands:
+--- profile-machine ---
+Profile the machine to generate optimal Sprawl config
+
+Usage: sprawl-cli profile-machine [OPTIONS]
+
+Options:
+--- search ---
+Perform a semantic search via the Archivist
+
+Usage: sprawl-cli search [OPTIONS] <QUERY>
+
+Arguments:
+--- index ---
+Explicitly control the Archivist background indexer
+
+Usage: sprawl-cli index [OPTIONS]
+
+Options:
+--- plugin ---
+Manage WASM plugins
+
+Usage: sprawl-cli plugin [OPTIONS] <COMMAND>
+
+Commands:
+--- bundle ---
+Bundle a directory into a token-optimized markdown representation
+
+Usage: sprawl-cli bundle [OPTIONS] <DIR>
+
+Arguments:
+--- resurrect ---
+Resurrect an archived project with a recovery kit
+
+Usage: sprawl-cli resurrect [OPTIONS] <PROJECT_PATH>
+
+Arguments:
+--- restore ---
+Reverse a Sweeper archive action
+
+Usage: sprawl-cli restore [OPTIONS] <PROJECT_NAME>
+
+Arguments:
+--- simulate-revoke ---
+Simulate revoking a token to assess blast radius
+
+Usage: sprawl-cli simulate-revoke [OPTIONS] --key <KEY>
+
+Options:
+--- verify ---
+Verify a vaulted secret via MCP network router
+
+Usage: sprawl-cli verify [OPTIONS] --key <KEY>
+
+Options:
+=== STEP 3 ===
+Sprawl Status ─────────────────────────────────────
+  Daemon:           Not running
+  Daemon IPC:       Disconnected
+  Projects indexed: 0 active, 0 idle
+  Sentinel inbox:   0 unreviewed secrets
+  Sweeper queue:    0 items (0 nuke-eligible)
+  Archivist:        Mock backend (real-archivist not built)
+  Inference:        Mock backend (real-inference not built)
+─────────────────────────────────────────────────────
+=== STEP 4 ===
+{"archivist_backend":"mock","daemon":{"pid":null,"running":false,"uptime_secs":0},"inference_backend":"mock","projects_indexed":{"active":0,"idle":0},"sentinel_unreviewed":0,"sweeper_nuke_eligible":0,"sweeper_queue_total":0}
+=== STEP 5 ===
+Daemon not running.
+daemon-status-exitcode: 1
+=== STEP 6 ===
+Starting daemon...
+[2m2026-07-19T18:16:08.187853Z[0m [33m WARN[0m [2msprawl_daemon::process[0m[2m:[0m PID file exists, checking if daemon is stale...
+
+thread 'main' (1204484) panicked at crates/sprawl-cli/src/commands/daemon.rs:68:77:
+Failed to open and initialize ledger: Other("Failed to initialize schema: table secrets already exists in \n            CREATE TABLE secrets (\n                id              TEXT PRIMARY KEY,\n                project_id      TEXT REFERENCES projects(id),\n                source_file     TEXT NOT NULL,\n                line_number     INTEGER,\n                classification  TEXT NOT NULL,\n                provider_prefix TEXT,\n                key_hash        TEXT NOT NULL,\n                entropy         REAL,\n                keyring_ref     TEXT,\n                discovered_at   TEXT NOT NULL,\n                verified_at     TEXT,\n                verified_status TEXT\n            );\n            CREATE TABLE ambiguous_secrets (\n                id TEXT PRIMARY KEY,\n                raw_value TEXT NOT NULL,\n                filepath TEXT NOT NULL,\n                status TEXT NOT NULL DEFAULT 'pending',\n                reviewed_at TEXT\n            );\n            CREATE TABLE sweep_history (\n                id              TEXT PRIMARY KEY,\n                project_id      TEXT REFERENCES projects(id),\n                target_path     TEXT NOT NULL,\n                action          TEXT NOT NULL,\n                original_size   INTEGER,\n                destination     TEXT,\n                executed_at     TEXT NOT NULL,\n                restored_at     TEXT\n            );\n            CREATE TABLE schema_meta (\n                key   TEXT PRIMARY KEY,\n                value TEXT NOT NULL\n            );\n            INSERT INTO schema_meta VALUES ('schema_version', '1');\n             at offset 26")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+Daemon not running.
+daemon-running-exitcode: 1
+=== STEP 7 ===
+Running Archaeologist Fast Path (WASM plugins)...
+Detection successful via fast-path!
+Ecosystem: rust
+Reproducible: true
+Entry points: ["workspace:crates/*", "workspace:tests"]
+Dependencies: 0 found
+=== STEP 8 ===
+{"dependencies_count":0,"ecosystem":"rust","entry_points":["workspace:crates/*","workspace:tests"],"evidence":["Found Cargo.lock"],"reproducible":true}
+=== STEP 9 ===
+Error: Failed to open ledger: Failed to initialize schema: table projects already exists in 
+            CREATE TABLE projects (
+                id              TEXT PRIMARY KEY,
+                root_path       TEXT NOT NULL UNIQUE,
+                ecosystem       TEXT,
+                status          TEXT NOT NULL DEFAULT 'active',
+                last_seen       TEXT NOT NULL,
+                idle_days       INTEGER DEFAULT 0,
+                stack_source    TEXT,
+                config_source   TEXT,
+                created_at      TEXT NOT NULL
+            );
+            CREATE TABLE secrets (
+                id              TEXT PRIMARY KEY,
+                project_id      TEXT REFERENCES projects(id),
+                source_file     TEXT NOT NULL,
+                line_number     INTEGER,
+                classification  TEXT NOT NULL,
+                provider_prefix TEXT,
+                key_hash        TEXT NOT NULL,
+                entropy         REAL,
+                keyring_ref     TEXT,
+                discovered_at   TEXT NOT NULL,
+                verified_at     TEXT,
+                verified_status TEXT
+            );
+            CREATE TABLE ambiguous_secrets (
+                id TEXT PRIMARY KEY,
+                raw_value TEXT NOT NULL,
+                filepath TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                reviewed_at TEXT
+            );
+            CREATE TABLE sweep_history (
+                id              TEXT PRIMARY KEY,
+                project_id      TEXT REFERENCES projects(id),
+                target_path     TEXT NOT NULL,
+                action          TEXT NOT NULL,
+                original_size   INTEGER,
+                destination     TEXT,
+                executed_at     TEXT NOT NULL,
+                restored_at     TEXT
+            );
+            CREATE TABLE schema_meta (
+                key   TEXT PRIMARY KEY,
+                value TEXT NOT NULL
+            );
+            INSERT INTO schema_meta VALUES ('schema_version', '1');
+             at offset 26
+=== STEP 10 ===
+{"error":"Failed to open ledger: Failed to initialize schema: table projects already exists in \n            CREATE TABLE projects (\n                id              TEXT PRIMARY KEY,\n                root_path       TEXT NOT NULL UNIQUE,\n                ecosystem       TEXT,\n                status          TEXT NOT NULL DEFAULT 'active',\n                last_seen       TEXT NOT NULL,\n                idle_days       INTEGER DEFAULT 0,\n                stack_source    TEXT,\n                config_source   TEXT,\n                created_at      TEXT NOT NULL\n            );\n            CREATE TABLE secrets (\n                id              TEXT PRIMARY KEY,\n                project_id      TEXT REFERENCES projects(id),\n                source_file     TEXT NOT NULL,\n                line_number     INTEGER,\n                classification  TEXT NOT NULL,\n                provider_prefix TEXT,\n                key_hash        TEXT NOT NULL,\n                entropy         REAL,\n                keyring_ref     TEXT,\n                discovered_at   TEXT NOT NULL,\n                verified_at     TEXT,\n                verified_status TEXT\n            );\n            CREATE TABLE ambiguous_secrets (\n                id TEXT PRIMARY KEY,\n                raw_value TEXT NOT NULL,\n                filepath TEXT NOT NULL,\n                status TEXT NOT NULL DEFAULT 'pending',\n                reviewed_at TEXT\n            );\n            CREATE TABLE sweep_history (\n                id              TEXT PRIMARY KEY,\n                project_id      TEXT REFERENCES projects(id),\n                target_path     TEXT NOT NULL,\n                action          TEXT NOT NULL,\n                original_size   INTEGER,\n                destination     TEXT,\n                executed_at     TEXT NOT NULL,\n                restored_at     TEXT\n            );\n            CREATE TABLE schema_meta (\n                key   TEXT PRIMARY KEY,\n                value TEXT NOT NULL\n            );\n            INSERT INTO schema_meta VALUES ('schema_version', '1');\n             at offset 26","status":"error"}
+=== STEP 11 ===
+No triage candidates found. Run `sprawl analyze <dir>` to register projects.
+=== STEP 12 ===
+=== STEP 13 ===
+Attempting to nuke /tmp/fake_nonexistent_dir...
+Error: path does not exist.
+triage-nuke-invalid-exitcode: 1
+=== STEP 14 ===
+Attempting to snooze /tmp/fake_nonexistent_dir...
+Error: path does not exist.
+triage-snooze-invalid-exitcode: 1
+=== STEP 15 ===
+🔍 Profiling machine...
+🛠️  Detected tools in PATH: cargo, rustc, node, npm, python
+👤 Inferred Persona: Full Stack Engineer
+💾 Generated patterns configuration at: /home/akshit/.sprawl/config/patterns.toml
+=== STEP 16 ===
+=== STEP 17 ===
+[0.95]  fn main() { println!("Hello"); }
+=== STEP 18 ===
+Daemon not running. Start it first with: sprawl daemon start
+=== STEP 19 ===
+Installed plugins:
+  - node_detector
+  - python_detector
+  - rust_detector
+=== STEP 20 ===
+Cargo.lock
+Cargo.toml
+COMMUNITY.md
+go-detector
+node-detector
+error: unrecognized subcommand 'verify'
+
+Usage: sprawl-cli plugin [OPTIONS] <COMMAND>
+
+For more information, try '--help'.
+=== STEP 21 ===
+Bundle written to /tmp/sprawl_test_bundle.tar.gz
+bundle-exitcode: 0
+=== STEP 22 ===
+[2m2026-07-19T18:16:11.885068Z[0m [33m WARN[0m [2marboard::platform::linux::x11[0m[2m:[0m Could not hand the clipboard contents over to the clipboard manager. The request timed out.
+✅ Project '00000000-0000-0000-0000-000000000000' resurrected successfully.
+📄 Generated /home/akshit/Projects/Sprawl/00000000-0000-0000-0000-000000000000/resurrection-kit.md
+📋 Copied bootstrap command to clipboard!
+resurrect-nonexistent-exitcode: 0
+=== STEP 23 ===
+Error: No archived project named '/tmp/totally_fake_path_xyz' found.
+Looked in: /tmp/totally_fake_path_xyz
+Use `sprawl triage list` to see what can be restored.
+restore-nonexistent-exitcode: 1
+=== STEP 24 ===
+error: unexpected argument 'fake-key-12345' found
+
+Usage: sprawl-cli simulate-revoke [OPTIONS] --key <KEY>
+
+For more information, try '--help'.
+simulate-revoke-exitcode: 2
+=== STEP 25 ===
+Verify a vaulted secret via MCP network router
+
+Usage: sprawl-cli verify [OPTIONS] --key <KEY>
+
+Options:
+  -k, --key <KEY>  The UUID of the secret in the ledger
+  -v, --verbose    Enable verbose logging output
+      --json       Output results as JSON (for scripting)
+  -h, --help       Print help
+=== STEP 26 ===
+Sprawl Status ─────────────────────────────────────
+  Daemon:           Not running
+  Daemon IPC:       Disconnected
+  Projects indexed: 0 active, 0 idle
+  Sentinel inbox:   0 unreviewed secrets
+  Sweeper queue:    0 items (0 nuke-eligible)
+  Archivist:        Mock backend (real-archivist not built)
+  Inference:        Mock backend (real-inference not built)
+─────────────────────────────────────────────────────
+=== STEP 27 ===
+Daemon not running.
+stopped-daemon-exitcode: 1
+=== STEP 28 ===
+{"archivist_backend":"mock","daemon":{"pid":null,"running":false,"uptime_secs":0},"inference_backend":"mock","projects_indexed":{"active":0,"idle":0},"sentinel_unreviewed":0,"sweeper_nuke_eligible":0,"sweeper_queue_total":0}

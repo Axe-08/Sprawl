@@ -12,3 +12,4 @@ pub mod simulate_revoke;
 pub mod status;
 pub mod triage;
 pub mod verify;
+pub mod models;

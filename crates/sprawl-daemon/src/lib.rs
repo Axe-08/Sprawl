@@ -74,7 +74,15 @@ pub async fn run_daemon_loop(
                                                 sprawl_inference::DeviceTarget::Cpu,
                                                 sprawl_inference::RealSysInfo,
                                             );
-                                            match sprawl_sentinel::llm::batch_classify(&secrets, &mut engine).await {
+                                            
+                                            // Load model first
+                                            let res = async {
+                                                let path = engine.ensure_model(None).await?;
+                                                engine.load_model(&path, None)?;
+                                                sprawl_sentinel::llm::batch_classify(&secrets, &mut engine).await
+                                            }.await;
+
+                                            match res {
                                                 Ok(results) => IpcResponse::BatchClassifyResult(results),
                                                 Err(e) => IpcResponse::Error(e.to_string()),
                                             }

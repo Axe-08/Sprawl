@@ -17,6 +17,7 @@ serde = { workspace = true, features = ["derive"] }
 serde_json = { workspace = true }
 sysinfo.workspace = true
 async-trait = "0.1"
+walkdir = "2.5.0"
 
 # real-archivist feature deps
 lancedb = { version = "0.31", optional = true }

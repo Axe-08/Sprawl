@@ -84,6 +84,8 @@ pub mod candle_embedder {
             let tokens = tokenizer.encode_batch(texts.to_vec(), true)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
 
+            let masks: Vec<Vec<u32>> = tokens.iter().map(|t| t.get_attention_mask().to_vec()).collect();
+
             let token_ids: Vec<Vec<u32>> = tokens.iter().map(|t| t.get_ids().to_vec()).collect();
             let device = &model.device;
             let n_sentences = token_ids.len();
@@ -93,25 +95,54 @@ pub mod candle_embedder {
             for ids in &token_ids {
                 flat_ids.extend(ids);
             }
+            let mut flat_masks: Vec<u32> = Vec::with_capacity(n_sentences * n_tokens);
+            for m in &masks {
+                flat_masks.extend(m);
+            }
+
             let token_ids = Tensor::from_vec(flat_ids, (n_sentences, n_tokens), device)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
             let token_type_ids = token_ids.zeros_like()
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            let mask_tensor = Tensor::from_vec(flat_masks, (n_sentences, n_tokens), device)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                .to_dtype(candle_core::DType::F32)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
             
             let embeddings = model.forward(&token_ids, &token_type_ids, None)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
 
-            let (_n_sentence, n_tokens, _hidden_size) = embeddings.dims3()
+            let mask = mask_tensor.unsqueeze(2).map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            let masked_embeddings = embeddings.broadcast_mul(&mask)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+            let sum_embeddings = masked_embeddings.sum(1)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
             
-            let embeddings = (embeddings.sum(1)
-                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))? / (n_tokens as f64))
+            // clamp mask sum to avoid division by zero
+            let mask_sum = mask.sum(1)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                .clamp(1e-9f32, f32::MAX)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
                 
-            let embeddings = embeddings.to_vec2::<f32>()
+            let mean_pooled = sum_embeddings.broadcast_div(&mask_sum)
                 .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
 
-            Ok(embeddings)
+            let norm = mean_pooled.sqr()
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                .sum_keepdim(1)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                .sqrt()
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?
+                .clamp(1e-9f32, f32::MAX)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                
+            let normalized = mean_pooled.broadcast_div(&norm)
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+                
+            let embeddings_out = normalized.to_vec2::<f32>()
+                .map_err(|e| sprawl_core::SprawlError::Other(e.to_string()))?;
+
+            Ok(embeddings_out)
         }
     }
 }

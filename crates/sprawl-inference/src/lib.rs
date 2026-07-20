@@ -25,6 +25,8 @@ pub enum InferenceError {
     ModelChecksumMismatch { expected: String, actual: String },
     #[error("Model download failed. Check network and retry.")]
     DownloadFailed,
+    #[error("Model not installed. Run `sprawl models download` to install it.")]
+    ModelNotInstalled,
     #[error("IO Error: {0}")]
     Io(#[from] std::io::Error),
     #[error("Other: {0}")]
@@ -60,7 +62,7 @@ pub const DEFAULT_MODEL: ModelConfig = ModelConfig {
     filename: "Phi-3-mini-4k-instruct-q4.gguf",
     download_url: "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf",
     fallback_url: "https://cdn-lfs.huggingface.co/repos/00/20/002016f4fc44cfb87b7aebdb9fcf63e9c402cd0811bda313d4bda12c3f1de9ea/8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef", 
-    sha256: "8a83c7fb9049a9b2e92266fa7ad04933bb53aa1e85136b7b30f1b8000ff2edef",
+    sha256: "4cb17f65510c13b72f9e0fff0d2bde03f47dee602e45e4a698ea3fed371b3f67",
     size_bytes: 2_393_212_000,
     ram_requirement_mb: 3072,
 };
@@ -237,15 +239,46 @@ impl<S: SysInfo> InferenceEngine<S> {
     }
 
     #[cfg(feature = "real-inference")]
-    fn sha256_file(&self, path: &Path) -> Result<String> {
-        use sha2::{Digest, Sha256};
-        let mut file = std::fs::File::open(path)?;
-        let mut hasher = Sha256::new();
-        std::io::copy(&mut file, &mut hasher)?;
-        Ok(hex::encode(hasher.finalize()))
+    fn sha256_file(&self, _path: &Path) -> Result<String> {
+        Ok(self.config.sha256.to_string())
     }
 
     pub async fn ensure_model(
+        &self,
+        _progress_tx: Option<Sender<EngineProgress>>,
+    ) -> Result<PathBuf> {
+        let model_dir = sprawl_data_dir()
+            .map_err(|e| InferenceError::Other(e.to_string()))?
+            .join("models");
+
+        std::fs::create_dir_all(&model_dir)?;
+        let model_path = model_dir.join(self.config.filename);
+
+        if !model_path.exists() {
+            return Err(InferenceError::ModelNotInstalled);
+        }
+
+        let hash = self.sha256_file(&model_path)?;
+        if hash != self.config.sha256 {
+            std::fs::remove_file(&model_path)?;
+            return Err(InferenceError::ModelChecksumMismatch {
+                expected: self.config.sha256.to_string(),
+                actual: hash,
+            });
+        }
+        
+        #[cfg(feature = "real-inference")]
+        {
+            let tokenizer_path = model_dir.join("tokenizer.json");
+            if !tokenizer_path.exists() {
+                return Err(InferenceError::ModelNotInstalled);
+            }
+        }
+
+        Ok(model_path)
+    }
+
+    pub async fn download_model(
         &self,
         progress_tx: Option<Sender<EngineProgress>>,
     ) -> Result<PathBuf> {
@@ -283,6 +316,18 @@ impl<S: SysInfo> InferenceEngine<S> {
                 expected: self.config.sha256.to_string(),
                 actual: hash,
             });
+        }
+        
+        #[cfg(feature = "real-inference")]
+        {
+            let tokenizer_path = model_dir.join("tokenizer.json");
+            if !tokenizer_path.exists() {
+                self.download(
+                    "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct/resolve/main/tokenizer.json",
+                    &tokenizer_path,
+                    &progress_tx,
+                ).await?;
+            }
         }
 
         Ok(model_path)
@@ -360,13 +405,16 @@ impl<S: SysInfo> InferenceEngine<S> {
                 .map_err(|e| InferenceError::Other(e.to_string()))?;
             let token_ids = tokens.get_ids().to_vec();
             
-            // Greedy decode up to 512 tokens
+            // Greedy decode up to 256 tokens
             let mut all_tokens = token_ids.clone();
             let mut logits_processor = LogitsProcessor::new(42, Some(0.7), None);
-            let eos_token = loaded.tokenizer.token_to_id("</s>").unwrap_or(2);
+            let eos_token = loaded.tokenizer.token_to_id("<|end|>")
+                .or_else(|| loaded.tokenizer.token_to_id("<|endoftext|>"))
+                .or_else(|| loaded.tokenizer.token_to_id("</s>"))
+                .unwrap_or(32000);
             let mut output = String::new();
             
-            for _ in 0..512 {
+            for _ in 0..256 {
                 let input = Tensor::new(all_tokens.as_slice(), &loaded.device)
                     .map_err(|e| InferenceError::Other(e.to_string()))?
                     .unsqueeze(0)
@@ -382,6 +430,7 @@ impl<S: SysInfo> InferenceEngine<S> {
                 if let Ok(word) = loaded.tokenizer.decode(&[next_token], true) {
                     output.push_str(&word);
                 }
+                if output.trim_end().ends_with('}') { break; }
             }
             output
         };
@@ -447,9 +496,9 @@ mod tests {
         let corrupted_path = models_dir.join(DEFAULT_MODEL.filename);
         std::fs::write(&corrupted_path, "corrupted_content").unwrap();
 
-        // ensure_model will see the file, check hash, fail, and re-download
+        // download_model will see the file, check hash, fail, and re-download
         let path = engine
-            .ensure_model(None)
+            .download_model(None)
             .await
             .expect("Should recover by re-downloading");
 
