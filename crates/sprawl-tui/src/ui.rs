@@ -45,12 +45,14 @@ fn draw_tabs(f: &mut Frame, app: &App, area: Rect) {
         Line::from(" [2] Sweeper Inbox "),
         Line::from(" [3] Sentinel "),
         Line::from(" [4] Search "),
+        Line::from(" [5] Ask "),
     ];
     let active_index = match app.current_tab {
         Tab::Dashboard => 0,
         Tab::SweeperInbox => 1,
         Tab::SentinelInbox => 2,
         Tab::SemanticSearch => 3,
+        Tab::Ask => 4,
     };
 
     let tabs = Tabs::new(titles)
@@ -106,6 +108,9 @@ fn draw_content(f: &mut Frame, app: &mut App, area: Rect) {
         Tab::SemanticSearch => {
             views::search::draw(f, app, area);
         }
+        Tab::Ask => {
+            views::ask::draw(f, app, area);
+        }
     }
 }
 
@@ -121,6 +126,7 @@ fn draw_footer(f: &mut Frame, app: &App, area: Rect) {
             }
         },
         Tab::SemanticSearch => " [Esc] Cancel search ".to_string(),
+        Tab::Ask => " [Esc] Cancel ask ".to_string(),
     };
 
     let p = Paragraph::new(footer_text)

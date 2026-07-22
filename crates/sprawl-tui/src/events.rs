@@ -1,7 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyEventKind};
 use tokio::sync::mpsc::UnboundedSender;
 
-use crate::app::{App, AppEvent, SearchPhase, Tab};
+use crate::app::{App, AppEvent, SearchPhase, AskPhase, Tab};
 
 pub fn handle_crossterm_event(
     app: &mut App,
@@ -45,6 +45,41 @@ pub fn handle_crossterm_event(
                         }
                         KeyCode::Backspace => {
                             app.search.query.pop();
+                        }
+                        _ => {}
+                    }
+                } else if app.current_tab == Tab::Ask && app.ask.phase == AskPhase::Input {
+                    match key.code {
+                        KeyCode::Esc => {
+                            app.input_mode = false;
+                            app.ask.query.clear();
+                        }
+                        KeyCode::Enter => {
+                            app.input_mode = false;
+                            app.ask.phase = AskPhase::Waiting;
+
+                            let tx_clone = tx.clone();
+                            let query = app.ask.query.clone();
+
+                            tokio::spawn(async move {
+                                let client_res = sprawl_daemon::IpcClient::new();
+                                if let Ok(client) = client_res {
+                                    let req = sprawl_daemon::IpcRequest::Ask { query };
+                                    if let Ok(sprawl_daemon::IpcResponse::AskResult(answer)) = client.send_request(&req).await {
+                                        let _ = tx_clone.send(AppEvent::AskResult(answer));
+                                    } else {
+                                        let _ = tx_clone.send(AppEvent::AskError("IPC ask failed".into()));
+                                    }
+                                } else {
+                                    let _ = tx_clone.send(AppEvent::AskError("Failed to init IPC client".into()));
+                                }
+                            });
+                        }
+                        KeyCode::Char(c) => {
+                            app.ask.query.push(c);
+                        }
+                        KeyCode::Backspace => {
+                            app.ask.query.pop();
                         }
                         _ => {}
                     }
@@ -103,11 +138,22 @@ pub fn handle_crossterm_event(
                             app.input_mode = true;
                         }
                     }
+                    KeyCode::Char('5') => {
+                        app.current_tab = Tab::Ask;
+                        if app.ask.phase == AskPhase::Input {
+                            app.input_mode = true;
+                        }
+                    }
                     KeyCode::Esc => {
                         if app.current_tab == Tab::SemanticSearch {
                             app.search.phase = SearchPhase::Input;
                             app.search.query.clear();
                             app.search.results.clear();
+                            app.input_mode = true;
+                        } else if app.current_tab == Tab::Ask {
+                            app.ask.phase = AskPhase::Input;
+                            app.ask.query.clear();
+                            app.ask.answer.clear();
                             app.input_mode = true;
                         }
                     }
@@ -271,6 +317,14 @@ pub fn handle_app_event(app: &mut App, event: AppEvent) {
         }
         AppEvent::SearchError(_) => {
             app.search.is_searching = false;
+        }
+        AppEvent::AskResult(answer) => {
+            app.ask.answer = answer;
+            app.ask.phase = AskPhase::Answered;
+        }
+        AppEvent::AskError(e) => {
+            app.ask.answer = e;
+            app.ask.phase = AskPhase::Answered;
         }
         AppEvent::SentinelInboxResult(secrets) => {
             app.sentinel.items = secrets.into_iter().map(|s| crate::app::InboxItem {

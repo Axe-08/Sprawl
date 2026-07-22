@@ -6,6 +6,7 @@ pub enum Tab {
     SweeperInbox,
     SentinelInbox,
     SemanticSearch,
+    Ask,
 }
 
 pub struct DashboardState {
@@ -28,6 +29,8 @@ pub enum AppEvent {
     BatchClassifyResult(Vec<(Uuid, SecretClassification)>),
     SearchResult(Vec<SearchResult>),
     SearchError(String),
+    AskResult(String),
+    AskError(String),
     SentinelInboxResult(Vec<DiscoveredSecret>),
 }
 
@@ -54,12 +57,22 @@ pub struct SearchState {
     pub is_searching: bool,
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum AskPhase { Input, Waiting, Answered }
+
+pub struct AskState {
+    pub query: String,
+    pub phase: AskPhase,
+    pub answer: String,
+}
+
 pub struct App {
     pub current_tab: Tab,
     pub dashboard: DashboardState,
     pub sweeper: SweeperInboxState,
     pub sentinel: SentinelInboxState,
     pub search: SearchState,
+    pub ask: AskState,
     pub theme: ThemeColors,
     pub should_quit: bool,
     pub input_mode: bool,
@@ -125,6 +138,11 @@ impl App {
                 selected_index: 0,
                 is_searching: false,
             },
+            ask: AskState {
+                query: String::new(),
+                phase: AskPhase::Input,
+                answer: String::new(),
+            },
             theme: ThemeColors::from_terminal(),
             should_quit: false,
             input_mode: false,
@@ -149,7 +167,8 @@ impl App {
             Tab::Dashboard => Tab::SweeperInbox,
             Tab::SweeperInbox => Tab::SentinelInbox,
             Tab::SentinelInbox => Tab::SemanticSearch,
-            Tab::SemanticSearch => Tab::Dashboard,
+            Tab::SemanticSearch => Tab::Ask,
+            Tab::Ask => Tab::Dashboard,
         };
     }
 
@@ -159,6 +178,7 @@ impl App {
             Tab::SweeperInbox => Tab::Dashboard,
             Tab::SentinelInbox => Tab::SweeperInbox,
             Tab::SemanticSearch => Tab::SentinelInbox,
+            Tab::Ask => Tab::SemanticSearch,
         };
     }
 }
