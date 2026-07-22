@@ -42,6 +42,8 @@ pub enum Command {
     Scan(commands::scan::ScanArgs),
     /// Perform a semantic search via the Archivist
     Search(commands::search::SearchArgs),
+    /// Ask a question about the codebase using natural language
+    Ask(commands::ask::AskArgs),
     /// Triage Sweeper inbox items
     Triage(commands::triage::TriageArgs),
     /// Display machine health and background task status
@@ -54,6 +56,8 @@ pub enum Command {
     ProfileMachine(commands::profile_machine::ProfileMachineArgs),
     /// Manage inference models
     Models(commands::models::ModelsArgs),
+    /// Manage projects registered for indexing
+    Project(commands::project::ProjectArgs),
 }
 
 #[tokio::main]
@@ -81,12 +85,14 @@ async fn main() {
         Command::Analyze(args) => commands::analyze::handle(args, cli.json).await,
         Command::Scan(args) => commands::scan::handle(args, cli.json),
         Command::Search(args) => commands::search::handle(args, cli.json).await,
+        Command::Ask(args) => commands::ask::handle(args, cli.json).await,
         Command::Triage(args) => commands::triage::handle(args, cli.json),
         Command::Status(args) => commands::status::handle(args, cli.json).await,
         Command::Index(args) => commands::index::handle(args, cli.json).await,
         Command::Resurrect(args) => commands::resurrect::handle(args, cli.json),
         Command::ProfileMachine(args) => commands::profile_machine::handle(args, cli.json),
         Command::Models(args) => commands::models::handle(args, cli.json).await,
+        Command::Project(args) => commands::project::handle(args, cli.json).await,
         Command::Ui => {
             if let Err(e) = sprawl_tui::run().await {
                 Err(sprawl_core::SprawlError::Other(format!("TUI Error: {}", e)))

@@ -1,8 +1,10 @@
 pub mod analyze;
+pub mod ask;
 pub mod bundle;
 pub mod daemon;
 pub mod index;
 pub mod plugin;
+pub mod project;
 pub mod restore;
 pub mod resurrect;
 pub mod profile_machine;

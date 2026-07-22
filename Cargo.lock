@@ -8196,6 +8196,7 @@ dependencies = [
  "chrono",
  "clap",
  "hex",
+ "indicatif",
  "libc",
  "rusqlite",
  "serde",
@@ -8239,6 +8240,7 @@ dependencies = [
  "toml 0.8.23",
  "tracing",
  "uuid",
+ "walkdir",
  "windows-sys 0.52.0",
  "zeroize",
 ]
@@ -8248,6 +8250,7 @@ name = "sprawl-daemon"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "criterion 0.5.1",
  "libc",
  "notify",
