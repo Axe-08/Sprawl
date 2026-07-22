@@ -23,6 +23,7 @@ aead = "0.5"
 keyring = "3"
 zeroize = { version = "1", features = ["zeroize_derive"] }
 base64 = "0.22"
+walkdir = "2.5.0"
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

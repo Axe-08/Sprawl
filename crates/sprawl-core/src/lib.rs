@@ -4,6 +4,7 @@ pub mod ledger;
 pub mod manifest;
 pub mod migrations;
 pub mod platform;
+pub mod fs;
 pub mod types;
 
 // Re-export common types

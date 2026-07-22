@@ -4,22 +4,52 @@ use sprawl_core::Result;
 use std::path::PathBuf;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct ProjectEntry {
+    pub id: String,
+    pub root_path: String,
+    pub status: String,
+    pub ecosystem: Option<String>,
+    pub created_at: String,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcRequest {
     Ping,
     Search { query: String, top_k: usize },
+    Ask { query: String },
     GetSentinelInbox,
     SentinelAccept { id: uuid::Uuid },
     SentinelReject { id: uuid::Uuid },
     BatchClassify { secrets: Vec<sprawl_sentinel::llm::DiscoveredSecret> },
     StartIndexer,
+    /// Poll the daemon for the current indexer progress
+    IndexStatus,
+    /// Register a directory as an active project
+    RegisterProject { path: String },
+    /// Set a project to idle (soft remove); set hard=true to fully delete from ledger
+    UnregisterProject { path: String, hard: bool },
+    /// List all projects in the ledger
+    ListProjects,
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub enum IpcResponse {
     Pong { pid: u32, uptime_secs: u64 },
     SearchResults(Vec<sprawl_archivist::SearchResult>),
+    AskResult(String),
     SentinelInbox(Vec<sprawl_sentinel::llm::DiscoveredSecret>),
     BatchClassifyResult(Vec<(uuid::Uuid, sprawl_sentinel::classify::SecretClassification)>),
+    /// Live indexer progress
+    IndexProgress {
+        files_indexed: u64,
+        files_total: u64,
+        current_file: String,
+        is_running: bool,
+    },
+    /// List of registered projects
+    Projects(Vec<ProjectEntry>),
+    /// Newly registered project ID
+    ProjectRegistered { id: String },
     Ok,
     Error(String),
 }

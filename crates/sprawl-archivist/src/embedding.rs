@@ -78,6 +78,10 @@ pub mod candle_embedder {
 
     impl Embedder for CandleEmbedder {
         fn embed(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>> {
+            if texts.is_empty() {
+                return Ok(vec![]);
+            }
+
             let tokenizer = self.tokenizer.lock().unwrap();
             let model = self.model.lock().unwrap();
 

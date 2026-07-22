@@ -1,5 +1,7 @@
 
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread::JoinHandle;
 use std::time::Duration;
 use thiserror::Error;
@@ -74,9 +76,14 @@ pub trait VectorDatabase: Send + Sync {
 }
 
 pub struct Archivist {
-    db: std::sync::Arc<dyn VectorDatabase>,
-    embedder: std::sync::Arc<dyn Embedder>,
-    pub indexer_handle: std::sync::Mutex<Option<JoinHandle<()>>>,
+    db: Arc<dyn VectorDatabase>,
+    embedder: Arc<dyn Embedder>,
+    pub indexer_handle: Mutex<Option<JoinHandle<()>>>,
+    // Progress counters - shared with the background indexer thread
+    pub files_indexed: Arc<AtomicU64>,
+    pub files_total: Arc<AtomicU64>,
+    pub current_file: Arc<Mutex<String>>,
+    pub is_running: Arc<AtomicBool>,
 }
 
 impl Archivist {
@@ -93,18 +100,35 @@ impl Archivist {
         let embedder = crate::embedding::candle_embedder::CandleEmbedder::load(&model_dir).await?;
         
         Ok(Self {
-            db: std::sync::Arc::new(db),
-            embedder: std::sync::Arc::new(embedder),
-            indexer_handle: std::sync::Mutex::new(None),
+            db: Arc::new(db),
+            embedder: Arc::new(embedder),
+            indexer_handle: Mutex::new(None),
+            files_indexed: Arc::new(AtomicU64::new(0)),
+            files_total: Arc::new(AtomicU64::new(0)),
+            current_file: Arc::new(Mutex::new(String::new())),
+            is_running: Arc::new(AtomicBool::new(false)),
         })
     }
 
-    pub fn new(db: std::sync::Arc<dyn VectorDatabase>, embedder: std::sync::Arc<dyn Embedder>) -> Self {
+    pub fn new(db: Arc<dyn VectorDatabase>, embedder: Arc<dyn Embedder>) -> Self {
         Self {
             db,
             embedder,
-            indexer_handle: std::sync::Mutex::new(None),
+            indexer_handle: Mutex::new(None),
+            files_indexed: Arc::new(AtomicU64::new(0)),
+            files_total: Arc::new(AtomicU64::new(0)),
+            current_file: Arc::new(Mutex::new(String::new())),
+            is_running: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Returns (files_indexed, files_total, current_file, is_running)
+    pub fn index_progress(&self) -> (u64, u64, String, bool) {
+        let indexed = self.files_indexed.load(Ordering::Relaxed);
+        let total = self.files_total.load(Ordering::Relaxed);
+        let current = self.current_file.lock().map(|g| g.clone()).unwrap_or_default();
+        let running = self.is_running.load(Ordering::Relaxed);
+        (indexed, total, current, running)
     }
 
     pub fn chunk_file(path: &Path) -> Result<Vec<TextChunk>> {
@@ -174,6 +198,10 @@ impl Archivist {
     pub fn start_background_indexer<R: RamMonitor + 'static>(&self, monitor: R) -> Result<()> {
         let _db_clone = self.db.clone();
         let _embedder_clone = self.embedder.clone();
+        let files_indexed = self.files_indexed.clone();
+        let files_total = self.files_total.clone();
+        let current_file = self.current_file.clone();
+        let is_running = self.is_running.clone();
 
         let handle = std::thread::spawn(move || {
             // In a real environment, set thread priority: set_low_priority().ok();
@@ -205,21 +233,54 @@ impl Archivist {
                     if let Ok(conn) = sprawl_core::ledger::initialize_db(&ledger_path) {
                         if let Ok(mut stmt) = conn.prepare("SELECT id, root_path FROM projects WHERE status = 'active'") {
                             if let Ok(projects) = stmt.query_map([], |r| Ok((r.get::<_, String>(0)?, r.get::<_, String>(1)?))) {
-                                for proj_res in projects.flatten() {
-                                    let (proj_id, root) = proj_res;
-                                    let root_path = std::path::PathBuf::from(root);
-                                    
+                                // Pre-count pass: count all indexable files across all active projects
+                                let mut total_count = 0u64;
+                                let all_projects: Vec<(String, std::path::PathBuf)> = projects
+                                    .flatten()
+                                    .map(|(id, root)| (id, std::path::PathBuf::from(root)))
+                                    .collect();
+
+                                for (_, root_path) in &all_projects {
+                                    use walkdir::WalkDir;
+                                    for entry in WalkDir::new(root_path)
+                                        .into_iter()
+                                        .filter_entry(|e| !sprawl_core::fs::is_ignored(e))
+                                        .filter_map(|e| e.ok())
+                                        .filter(|e| e.file_type().is_file())
+                                    {
+                                        if let Some(ext) = entry.path().extension() {
+                                            if ext == "rs" || ext == "js" || ext == "py" || ext == "md" || ext == "toml" || ext == "json" || ext == "c" || ext == "cpp" || ext == "h" || ext == "go" {
+                                                total_count += 1;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                files_total.store(total_count, Ordering::Relaxed);
+                                files_indexed.store(0, Ordering::Relaxed);
+                                is_running.store(true, Ordering::Relaxed);
+                                tracing::info!("Indexer starting: {} files to index across {} project(s)", total_count, all_projects.len());
+
+                                for (proj_id, root_path) in &all_projects {
                                     use walkdir::WalkDir;
                                     
-                                    for entry in WalkDir::new(&root_path)
+                                    for entry in WalkDir::new(root_path)
                                         .into_iter()
+                                        .filter_entry(|e| !sprawl_core::fs::is_ignored(e))
                                         .filter_map(|e| e.ok())
                                         .filter(|e| e.file_type().is_file())
                                     {
                                         let path = entry.path();
                                         if let Some(ext) = path.extension() {
                                             if ext == "rs" || ext == "js" || ext == "py" || ext == "md" || ext == "toml" || ext == "json" || ext == "c" || ext == "cpp" || ext == "h" || ext == "go" {
-                                                if let Ok(chunks) = Self::chunk_file(&path) {
+                                                // Update current file tracking
+                                                let rel = path.strip_prefix(root_path).unwrap_or(path);
+                                                let rel_str = rel.to_string_lossy().into_owned();
+                                                if let Ok(mut cur) = current_file.lock() {
+                                                    *cur = rel_str.clone();
+                                                }
+
+                                                if let Ok(chunks) = Self::chunk_file(path) {
                                                     let texts: Vec<&str> = chunks.iter().map(|c| c.text.as_str()).collect();
                                                     if let Ok(embeddings) = embedder_clone.embed(&texts) {
                                                         let mut indexed = Vec::new();
@@ -227,7 +288,7 @@ impl Archivist {
                                                             indexed.push(IndexedChunk {
                                                                 id: uuid::Uuid::new_v4().to_string(),
                                                                 project_id: proj_id.clone(),
-                                                                file_path: path.strip_prefix(&root_path).unwrap_or(&path).to_string_lossy().into_owned(),
+                                                                file_path: path.strip_prefix(root_path).unwrap_or(path).to_string_lossy().into_owned(),
                                                                 chunk_text: c.text,
                                                                 chunk_start_line: c.start_line,
                                                                 chunk_end_line: c.end_line,
@@ -245,10 +306,17 @@ impl Archivist {
                                                             });
                                                     }
                                                 }
+
+                                                let n = files_indexed.fetch_add(1, Ordering::Relaxed) + 1;
+                                                let total = files_total.load(Ordering::Relaxed);
+                                                tracing::info!("[{}/{}] Indexed {}", n, total, rel_str);
                                             }
                                         }
                                     }
                                 }
+
+                                is_running.store(false, Ordering::Relaxed);
+                                tracing::info!("Indexer pass complete: {} files indexed", files_indexed.load(Ordering::Relaxed));
                             }
                         }
                     }
