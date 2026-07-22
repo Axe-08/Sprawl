@@ -70,9 +70,15 @@ impl LedgerBackend for SqliteLedgerStore {
 
     fn queue_ambiguous(&self, val: &str, filepath: &str) {
         let conn = self.conn.lock().unwrap();
+        
+        let mut stmt = conn.prepare("SELECT 1 FROM ambiguous_secrets WHERE raw_value = ?1 AND status = 'pending'").unwrap();
+        if stmt.exists([val]).unwrap_or(false) {
+            return; // Skip duplicate
+        }
+
         let id = uuid::Uuid::new_v4().to_string();
         let _ = conn.execute(
-            "INSERT OR IGNORE INTO ambiguous_secrets (id, raw_value, filepath, status) VALUES (?1, ?2, ?3, 'pending')",
+            "INSERT INTO ambiguous_secrets (id, raw_value, filepath, status) VALUES (?1, ?2, ?3, 'pending')",
             (&id, val, filepath),
         );
     }

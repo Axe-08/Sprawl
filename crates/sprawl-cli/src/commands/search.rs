@@ -38,7 +38,9 @@ pub async fn handle(args: &SearchArgs, is_json: bool) -> Result<()> {
             .map(|r| {
                 serde_json::json!({
                     "score": r.similarity_score,
-                    "file": r.chunk_text, // The mock returns the file path in chunk_text currently
+                    "file": r.file_path,
+                    "start_line": r.start_line,
+                    "end_line": r.end_line,
                     "text": r.chunk_text
                 })
             })
@@ -55,7 +57,8 @@ pub async fn handle(args: &SearchArgs, is_json: bool) -> Result<()> {
         }
 
         for r in &results {
-            println!("[{:.2}]  {}", r.similarity_score, r.chunk_text);
+            println!("[{:.2}] {}:L{}-{}", r.similarity_score, r.file_path, r.start_line, r.end_line);
+            println!("{}\n", r.chunk_text);
         }
     }
 

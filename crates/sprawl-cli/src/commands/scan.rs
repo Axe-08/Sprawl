@@ -38,17 +38,36 @@ pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
         println!("Scanning directory: {}", args.dir.display());
     }
 
+    let pb = if !use_json {
+        let p = indicatif::ProgressBar::new_spinner();
+        p.set_style(
+            indicatif::ProgressStyle::default_spinner()
+                .tick_chars("⠁⠂⠄⡀⢀⠠⠐⠈ ")
+                .template("{spinner:.green} {msg}")
+                .unwrap(),
+        );
+        p.enable_steady_tick(std::time::Duration::from_millis(100));
+        Some(p)
+    } else {
+        None
+    };
+
     let mut findings = Vec::new();
+    let mut files_scanned = 0;
 
     for entry in walkdir::WalkDir::new(&args.dir)
         .into_iter()
+        .filter_entry(|e| !sprawl_core::fs::is_ignored(e))
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
     {
         let path = entry.path();
-        
-        if path.components().any(|c| c.as_os_str() == ".git" || c.as_os_str() == "target") {
-            continue;
+        files_scanned += 1;
+
+        if let Some(ref p) = pb {
+            if files_scanned % 100 == 0 {
+                p.set_message(format!("Scanned {} files, found {} ambiguous secrets...", files_scanned, findings.len()));
+            }
         }
 
         if let Ok(contents) = std::fs::read_to_string(path) {
@@ -78,6 +97,11 @@ pub fn handle(args: &ScanArgs, is_json: bool) -> Result<()> {
                 }
             }
         }
+    }
+
+    if let Some(p) = pb {
+        p.finish_and_clear();
+        println!("Scan complete. Checked {} files, found {} ambiguous secrets.", files_scanned, findings.len());
     }
 
     if use_json {

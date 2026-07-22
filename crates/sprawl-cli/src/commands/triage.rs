@@ -20,12 +20,39 @@ pub enum TriageCommand {
     Archive { project: String },
     /// Snooze for 30d
     Snooze { project: String },
+    /// Clear all pending ambiguous secrets
+    ClearInbox,
 }
 
 pub fn handle(args: &TriageArgs, is_json: bool) -> Result<()> {
     let sweeper = SweeperEngine::new();
 
     match &args.command {
+        TriageCommand::ClearInbox => {
+            let data_dir = sprawl_core::platform::sprawl_data_dir()?;
+            let ledger_path = data_dir.join("ledger.sqlite");
+            if let Ok(conn) = rusqlite::Connection::open(&ledger_path) {
+                match conn.execute("DELETE FROM ambiguous_secrets;", []) {
+                    Ok(count) => {
+                        let _ = conn.execute("VACUUM;", []);
+                        if is_json {
+                            println!("{}", serde_json::json!({ "status": "success", "cleared": count }));
+                        } else {
+                            println!("Successfully cleared {} ambiguous secrets from the inbox.", count);
+                        }
+                    },
+                    Err(e) => {
+                        if is_json {
+                            println!("{}", serde_json::json!({ "status": "error", "message": e.to_string() }));
+                        } else {
+                            println!("Failed to clear inbox: {}", e);
+                        }
+                    }
+                }
+            } else {
+                println!("Failed to open ledger database.");
+            }
+        }
         TriageCommand::List => {
             let data_dir = sprawl_core::platform::sprawl_data_dir()?;
             let ledger_path = data_dir.join("ledger.sqlite");
